@@ -28,7 +28,7 @@ Open Source Firefox Extension (WebExtension) that adds audio recording, sending,
    git clone https://github.com/m4nt/3cx-audio-recorder-extension.git
    ```
 2. In Firefox, go to `about:debugging` > "This Firefox" > "Load Temporary Add-on".
-3. Select the `manifest.json` file from the project folder.
+3. Select the `3cx-audio.zip` file from the project folder.
 4. Done! The audio record button will appear in your 3CX chat.
 
 ## ⚙️ How it works
