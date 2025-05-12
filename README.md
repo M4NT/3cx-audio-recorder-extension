@@ -25,7 +25,7 @@ Open Source Firefox Extension (WebExtension) that adds audio recording, sending,
 
 1. Download or clone this repository:
    ```bash
-   git clone https://github.com/your-username/3cx-audio-ux.git
+   git clone https://github.com/m4nt/3cx-audio-recorder-extension.git
    ```
 2. In Firefox, go to `about:debugging` > "This Firefox" > "Load Temporary Add-on".
 3. Select the `manifest.json` file from the project folder.
@@ -56,4 +56,4 @@ Open an issue or submit a pull request to suggest improvements, report bugs, or 
 
 ---
 
-**Developed with ❤️ by [Your Name or GitHub Username]**
+**Developed with ❤️ by M4NT / @yan.mantovani**
