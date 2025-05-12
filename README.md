@@ -56,4 +56,4 @@ Open an issue or submit a pull request to suggest improvements, report bugs, or 
 
 ---
 
-**Developed with ❤️ by M4NT / @yan.mantovani**
+**Developed with ❤️ by M4NT / [@yan.mantovani](https://www.instagram.com/yan.mantovani/)**
