@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      width: 200px;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+    }
+    
+    .button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 8px 16px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 4px;
+      background-color: #2196F3;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .button:hover {
+      background-color: #1976D2;
+    }
+    
+    .button.recording {
+      background-color: #f44336;
+    }
+    
+    .button.recording:hover {
+      background-color: #d32f2f;
+    }
+    
+    .material-icons {
+      margin-right: 8px;
+    }
+    
+    .status {
+      text-align: center;
+      margin-top: 16px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <button id="recordButton" class="button">
+    <span class="material-icons">mic</span>
+    <span>Gravar Áudio</span>
+  </button>
+  
+  <button id="stopButton" class="button recording" style="display: none;">
+    <span class="material-icons">stop</span>
+    <span>Parar Gravação</span>
+  </button>
+  
+  <p id="status" class="status">Pronto</p>
+  
+  <script src="popup.js"></script>
+</body>
+</html> 

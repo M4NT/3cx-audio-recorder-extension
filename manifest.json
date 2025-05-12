@@ -1,0 +1,45 @@
+{
+  "manifest_version": 2,
+  "name": "3CX Audio Extension",
+  "version": "1.0",
+  "description": "Extensão para integração com o chat do 3CX",
+  
+  "browser_action": {
+    "default_popup": "popup.html"
+  },
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.3cx.com/*",
+        "*://*.3cx.net/*",
+        "*://*.3cx.org/*",
+        "*://*.my3cx.com.br/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "*://*.3cx.com/*",
+    "*://*.3cx.net/*",
+    "*://*.3cx.org/*",
+    "*://*.my3cx.com.br/*",
+    "https://fonts.googleapis.com/*",
+    "https://fonts.gstatic.com/*"
+  ],
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "3cx-audio-extension@3cx.local",
+      "strict_min_version": "57.0"
+    }
+  }
+} 

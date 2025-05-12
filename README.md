@@ -8,7 +8,7 @@ Open Source Firefox Extension (WebExtension) that adds audio recording, sending,
 - **Preview before sending:** Listen to your recorded audio before sending, with a custom player and action buttons.
 - **Custom audio player:** All sent and received audios in the chat are displayed with a beautiful, responsive, and consistent player, including:
   - Microphone icon
-  - Sender’s name (first name only)
+  - Sender's name (first name only)
   - Custom progress bar
   - Large, accessible play/pause button
   - Elapsed and total time
@@ -36,7 +36,7 @@ Open Source Firefox Extension (WebExtension) that adds audio recording, sending,
 - The record button is automatically injected into the 3CX chat bar.
 - When recording, a floating window shows the timer, controls, and animation.
 - After stopping, you can listen, send, or cancel the audio.
-- All audios (sent and received) are displayed with the custom player, showing the sender’s first name (extracted from the 3CX DOM).
+- All audios (sent and received) are displayed with the custom player, showing the sender's first name (extracted from the 3CX DOM).
 - The layout is responsive and does not interfere with native chat buttons.
 
 ## 📝 License
