@@ -670,16 +670,25 @@ function removerJanelaFlutuante() {
 // Função para iniciar a gravação
 async function startRecording() {
   try {
+    // Solicita permissão de áudio
     audioStream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
-        autoGainControl: true
+        autoGainControl: true,
+        sampleRate: 44100
       } 
     });
     
+    // Verifica se o navegador suporta o formato
+    const mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      throw new Error('Formato de áudio não suportado pelo navegador');
+    }
+    
     mediaRecorder = new MediaRecorder(audioStream, {
-      mimeType: 'audio/webm;codecs=opus'
+      mimeType: mimeType,
+      audioBitsPerSecond: 128000
     });
     
     audioChunks = [];
@@ -691,10 +700,10 @@ async function startRecording() {
     };
     
     mediaRecorder.onstop = () => {
-      audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      audioBlob = new Blob(audioChunks, { type: mimeType });
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       audioFile = new File([audioBlob], `audio_message_${timestamp}.webm`, {
-        type: 'audio/webm',
+        type: mimeType,
         lastModified: Date.now()
       });
       
@@ -1085,8 +1094,89 @@ if (document.readyState === 'loading') {
   startObservingAudio();
 }
 
-// Listener para mensagens do background script
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+// Atualiza o CSS global para melhor responsividade
+(function garantirFlexBarraChat() {
+  const style = document.createElement('style');
+  style.textContent = `
+    #chat-form-controls {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      gap: 4px;
+      min-height: 40px;
+      padding: 4px 8px;
+    }
+    #chat-form-controls > * {
+      vertical-align: middle !important;
+      margin: 0 2px !important;
+      flex-shrink: 0;
+    }
+    #audioRecordButton {
+      padding: 5px !important;
+      transition: all 0.3s ease !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-width: 32px !important;
+      height: 32px !important;
+      border-radius: 4px !important;
+      background: transparent !important;
+      border: none !important;
+      cursor: pointer !important;
+      flex-shrink: 0 !important;
+    }
+    #audioRecordButton:hover {
+      background-color: rgba(0, 0, 0, 0.05) !important;
+    }
+    #audioRecordButton.recording .record-svg svg {
+      color: #f44336 !important;
+      animation: pulse 1s infinite !important;
+    }
+    .floating-audio-container {
+      position: fixed !important;
+      bottom: 20px !important;
+      right: 20px !important;
+      background: white !important;
+      border-radius: 8px !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+      padding: 16px !important;
+      z-index: 9999 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 12px !important;
+      min-width: 280px !important;
+      max-width: 90vw !important;
+      margin: 0 auto !important;
+    }
+    @media (max-width: 480px) {
+      .floating-audio-container {
+        left: 10px !important;
+        right: 10px !important;
+        bottom: 10px !important;
+        width: calc(100% - 20px) !important;
+        min-width: auto !important;
+      }
+      #chat-form-controls {
+        padding: 2px 4px !important;
+      }
+      #audioRecordButton {
+        min-width: 28px !important;
+        height: 28px !important;
+        padding: 4px !important;
+      }
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Atualiza o listener de mensagens para usar chrome.runtime em vez de browser.runtime
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Mensagem recebida:', message);
   
   // Processa o comando recebido
@@ -1118,43 +1208,4 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Retorna true para indicar que a resposta será assíncrona
   return true;
-});
-
-// Remover função de botão customizado de anexar arquivo e ajustar para reposicionar o nativo
-function reposicionarBotaoAnexarNativo() {
-  const recordButton = document.querySelector('#audioRecordButton');
-  if (!recordButton) return;
-  const chatControls = document.querySelector('#chat-form-controls');
-  if (!chatControls) return;
-  // O botão de anexar nativo geralmente é um botão ou span com ícone de clipe
-  // Vamos procurar por um botão ou span com ícone de clipe
-  let attachBtn = chatControls.querySelector('button, span, i, svg');
-  // Procurar pelo ícone de clipe
-  const allBtns = Array.from(chatControls.querySelectorAll('button, span, i, svg'));
-  attachBtn = allBtns.find(el => el.innerHTML.includes('clip') || el.title?.toLowerCase().includes('anexar') || el.outerHTML.includes('paperclip'));
-  if (attachBtn && recordButton.nextSibling !== attachBtn) {
-    // Move o botão de anexar para logo após o botão de gravar
-    recordButton.parentNode.insertBefore(attachBtn, recordButton.nextSibling);
-  }
-}
-// Chamar sempre que garantir/injetar o botão de gravação
-setInterval(reposicionarBotaoAnexarNativo, 1500);
-
-// CSS global para garantir alinhamento horizontal dos botões do chat
-(function garantirFlexBarraChat() {
-  const style = document.createElement('style');
-  style.textContent = `
-    #chat-form-controls {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      flex-wrap: nowrap !important;
-      gap: 4px;
-    }
-    #chat-form-controls > * {
-      vertical-align: middle !important;
-      margin: 0 2px !important;
-    }
-  `;
-  document.head.appendChild(style);
-})(); 
+}); 
