@@ -670,14 +670,19 @@ function removerJanelaFlutuante() {
 // Função para iniciar a gravação
 async function startRecording() {
   try {
-    // Solicita permissão de áudio
+    // Solicita permissão de áudio com configurações otimizadas
     audioStream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
         sampleRate: 44100,
-        channelCount: 1
+        channelCount: 1,
+        latency: 0,
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true
       } 
     });
     
@@ -687,9 +692,11 @@ async function startRecording() {
       throw new Error('Formato de áudio não suportado pelo navegador');
     }
     
+    // Configura o MediaRecorder com qualidade otimizada
     mediaRecorder = new MediaRecorder(audioStream, {
       mimeType: mimeType,
-      audioBitsPerSecond: 128000
+      audioBitsPerSecond: 128000,
+      videoBitsPerSecond: 0
     });
     
     audioChunks = [];
@@ -724,7 +731,8 @@ async function startRecording() {
       }
     };
     
-    mediaRecorder.start(100); // Coleta dados a cada 100ms
+    // Inicia a gravação com intervalo menor para melhor qualidade
+    mediaRecorder.start(50);
     removerJanelaFlutuante();
     gravacaoTempo = 0;
     iniciarTimerGravacao(true);
@@ -1146,31 +1154,38 @@ if (document.readyState === 'loading') {
       flex-direction: row !important;
       align-items: center !important;
       flex-wrap: nowrap !important;
-      gap: 4px;
-      min-height: 40px;
-      padding: 4px 8px;
+      gap: 8px !important;
+      min-height: 48px !important;
+      padding: 8px 12px !important;
+      background: #fff !important;
+      border-top: 1px solid rgba(0,0,0,0.1) !important;
     }
     #chat-form-controls > * {
       vertical-align: middle !important;
-      margin: 0 2px !important;
-      flex-shrink: 0;
+      margin: 0 !important;
+      flex-shrink: 0 !important;
     }
     #audioRecordButton {
-      padding: 5px !important;
-      transition: all 0.3s ease !important;
+      padding: 8px !important;
+      transition: all 0.2s ease !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      min-width: 32px !important;
-      height: 32px !important;
-      border-radius: 4px !important;
+      min-width: 40px !important;
+      height: 40px !important;
+      border-radius: 8px !important;
       background: transparent !important;
       border: none !important;
       cursor: pointer !important;
       flex-shrink: 0 !important;
+      position: relative !important;
     }
     #audioRecordButton:hover {
       background-color: rgba(0, 0, 0, 0.05) !important;
+      transform: scale(1.05) !important;
+    }
+    #audioRecordButton.recording {
+      background-color: rgba(244, 67, 54, 0.1) !important;
     }
     #audioRecordButton.recording .record-svg svg {
       color: #f44336 !important;
@@ -1178,41 +1193,62 @@ if (document.readyState === 'loading') {
     }
     .floating-audio-container {
       position: fixed !important;
-      bottom: 20px !important;
-      right: 20px !important;
+      bottom: 24px !important;
+      right: 24px !important;
       background: white !important;
-      border-radius: 8px !important;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
-      padding: 16px !important;
+      border-radius: 16px !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+      padding: 20px !important;
       z-index: 9999 !important;
       display: flex !important;
       flex-direction: column !important;
-      gap: 12px !important;
-      min-width: 280px !important;
+      gap: 16px !important;
+      min-width: 320px !important;
       max-width: 90vw !important;
       margin: 0 auto !important;
+      transition: all 0.3s ease !important;
     }
-    @media (max-width: 480px) {
-      .floating-audio-container {
-        left: 10px !important;
-        right: 10px !important;
-        bottom: 10px !important;
-        width: calc(100% - 20px) !important;
-        min-width: auto !important;
-      }
+    @media (max-width: 768px) {
       #chat-form-controls {
-        padding: 2px 4px !important;
+        padding: 6px 8px !important;
+        min-height: 44px !important;
       }
       #audioRecordButton {
-        min-width: 28px !important;
-        height: 28px !important;
+        min-width: 36px !important;
+        height: 36px !important;
+        padding: 6px !important;
+      }
+      .floating-audio-container {
+        bottom: 16px !important;
+        right: 16px !important;
+        left: 16px !important;
+        padding: 16px !important;
+        min-width: auto !important;
+      }
+    }
+    @media (max-width: 480px) {
+      #chat-form-controls {
+        padding: 4px 6px !important;
+        min-height: 40px !important;
+        gap: 4px !important;
+      }
+      #audioRecordButton {
+        min-width: 32px !important;
+        height: 32px !important;
         padding: 4px !important;
+      }
+      .floating-audio-container {
+        bottom: 12px !important;
+        right: 12px !important;
+        left: 12px !important;
+        padding: 12px !important;
+        border-radius: 12px !important;
       }
     }
     @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
     }
   `;
   document.head.appendChild(style);
