@@ -1,6 +1,44 @@
-# 3CX Audio UX
+# 3CX Audio Recorder Extension
 
-Open Source Firefox Extension (WebExtension) that adds audio recording, sending, and a modern, consistent audio player to the 3CX chat.
+Esta extensão permite a integração com o chat do 3CX para gravação de áudio.
+
+## Estrutura do Projeto
+
+O projeto está organizado em duas pastas principais:
+
+- `firefox-extension/`: Contém a versão da extensão para o Mozilla Firefox
+- `chrome-extension/`: Contém a versão da extensão para o Google Chrome
+
+## Instalação
+
+### Firefox
+1. Abra o Firefox
+2. Digite `about:debugging` na barra de endereços
+3. Clique em "Este Firefox"
+4. Clique em "Carregar extensão temporária"
+5. Navegue até a pasta `firefox-extension` e selecione o arquivo `manifest.json`
+
+### Chrome
+1. Abra o Chrome
+2. Digite `chrome://extensions` na barra de endereços
+3. Ative o "Modo do desenvolvedor" no canto superior direito
+4. Clique em "Carregar sem compactação"
+5. Navegue até a pasta `chrome-extension` e selecione-a
+
+## Funcionalidades
+
+- Integração com o chat do 3CX
+- Gravação de áudio
+- Interface amigável
+
+## Requisitos
+
+- Firefox 58.0 ou superior (para a versão Firefox)
+- Chrome 88.0 ou superior (para a versão Chrome)
+
+## Licença
+
+Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
 ## ✨ Features
 
@@ -20,29 +58,6 @@ Open Source Firefox Extension (WebExtension) that adds audio recording, sending,
 ## 🖼️ Preview
 
 ![Custom player preview](./screenshot.png)
-
-## 🚀 Installation
-
-1. Download or clone this repository:
-   ```bash
-   git clone https://github.com/m4nt/3cx-audio-recorder-extension.git
-   ```
-2. In Firefox, go to `about:debugging` > "This Firefox" > "Load Temporary Add-on".
-3. Select the `3cx-audio.zip` file from the project folder.
-4. Done! The audio record button will appear in your 3CX chat.
-
-## ⚙️ How it works
-
-- The record button is automatically injected into the 3CX chat bar.
-- When recording, a floating window shows the timer, controls, and animation.
-- After stopping, you can listen, send, or cancel the audio.
-- All audios (sent and received) are displayed with the custom player, showing the sender's first name (extracted from the 3CX DOM).
-- The layout is responsive and does not interfere with native chat buttons.
-
-## 📝 License
-
-This project is licensed under the MIT License.  
-See the [LICENSE](./LICENSE) file for more details.
 
 ## 🤝 Contributing
 
