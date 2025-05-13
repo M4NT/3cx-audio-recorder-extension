@@ -1226,23 +1226,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.command) {
     case 'start_recording':
       startRecording()
-        .then(response => sendResponse(response))
-        .catch(error => sendResponse({ 
-          success: false, 
-          error: 'Erro ao iniciar gravação: ' + error.message 
-        }));
+        .then(response => {
+          console.log('Resposta do startRecording:', response);
+          sendResponse(response);
+        })
+        .catch(error => {
+          console.error('Erro no startRecording:', error);
+          sendResponse({ 
+            success: false, 
+            error: 'Erro ao iniciar gravação: ' + error.message 
+          });
+        });
       break;
       
     case 'stop_recording':
       stopRecording()
-        .then(response => sendResponse(response))
-        .catch(error => sendResponse({ 
-          success: false, 
-          error: 'Erro ao parar gravação: ' + error.message 
-        }));
+        .then(response => {
+          console.log('Resposta do stopRecording:', response);
+          sendResponse(response);
+        })
+        .catch(error => {
+          console.error('Erro no stopRecording:', error);
+          sendResponse({ 
+            success: false, 
+            error: 'Erro ao parar gravação: ' + error.message 
+          });
+        });
       break;
       
     default:
+      console.warn('Comando desconhecido:', message.command);
       sendResponse({ 
         success: false, 
         error: 'Comando desconhecido: ' + message.command 
@@ -1251,4 +1264,68 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Retorna true para indicar que a resposta será assíncrona
   return true;
-}); 
+});
+
+// Função para verificar se o navegador suporta a API de gravação
+function verificarSuporteGravação() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.error('API de gravação não suportada pelo navegador');
+    return false;
+  }
+  
+  if (!MediaRecorder) {
+    console.error('MediaRecorder não suportado pelo navegador');
+    return false;
+  }
+  
+  const mimeType = 'audio/webm;codecs=opus';
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    console.error('Formato de áudio não suportado pelo navegador');
+    return false;
+  }
+  
+  return true;
+}
+
+// Função para solicitar permissão de áudio
+async function solicitarPermissaoAudio() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100,
+        channelCount: 1
+      } 
+    });
+    stream.getTracks().forEach(track => track.stop());
+    return true;
+  } catch (error) {
+    console.error('Erro ao solicitar permissão de áudio:', error);
+    return false;
+  }
+}
+
+// Inicialização da extensão
+async function inicializarExtensao() {
+  if (!verificarSuporteGravação()) {
+    console.error('Navegador não suporta gravação de áudio');
+    return;
+  }
+  
+  const temPermissao = await solicitarPermissaoAudio();
+  if (!temPermissao) {
+    console.error('Permissão de áudio negada');
+    return;
+  }
+  
+  console.log('[3CX Audio Extension] Inicializada com sucesso');
+}
+
+// Inicia a extensão quando o DOM estiver pronto
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', inicializarExtensao);
+} else {
+  inicializarExtensao();
+} 
