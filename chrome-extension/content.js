@@ -676,7 +676,8 @@ async function startRecording() {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 44100
+        sampleRate: 44100,
+        channelCount: 1
       } 
     });
     
@@ -699,18 +700,28 @@ async function startRecording() {
       }
     };
     
+    mediaRecorder.onerror = (event) => {
+      console.error('Erro na gravação:', event.error);
+      stopRecording(true);
+    };
+    
     mediaRecorder.onstop = () => {
-      audioBlob = new Blob(audioChunks, { type: mimeType });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      audioFile = new File([audioBlob], `audio_message_${timestamp}.webm`, {
-        type: mimeType,
-        lastModified: Date.now()
-      });
-      
-      audioStream.getTracks().forEach(track => track.stop());
-      pararTimerGravacao();
-      beep();
-      atualizarJanelaFlutuante('preview', audioBlob, audioFile);
+      try {
+        audioBlob = new Blob(audioChunks, { type: mimeType });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        audioFile = new File([audioBlob], `audio_message_${timestamp}.webm`, {
+          type: mimeType,
+          lastModified: Date.now()
+        });
+        
+        audioStream.getTracks().forEach(track => track.stop());
+        pararTimerGravacao();
+        beep();
+        atualizarJanelaFlutuante('preview', audioBlob, audioFile);
+      } catch (error) {
+        console.error('Erro ao finalizar gravação:', error);
+        stopRecording(true);
+      }
     };
     
     mediaRecorder.start(100); // Coleta dados a cada 100ms
@@ -722,6 +733,20 @@ async function startRecording() {
     return { success: true };
   } catch (error) {
     console.error('Erro ao iniciar gravação:', error);
+    // Limpa recursos em caso de erro
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
+    }
+    mediaRecorder = null;
+    audioStream = null;
+    audioChunks = [];
+    audioBlob = null;
+    audioFile = null;
+    isRecording = false;
+    isPaused = false;
+    tempoPausado = 0;
+    pausaTimestamp = null;
+    removerJanelaFlutuante();
     return { success: false, error: error.message };
   }
 }
@@ -732,10 +757,13 @@ async function stopRecording(cancelar = false) {
       removerJanelaFlutuante();
       return { success: false, error: 'Nenhuma gravação em andamento' };
     }
+
     if (cancelar) {
       mediaRecorder.onstop = null;
       mediaRecorder.stop();
-      audioStream.getTracks().forEach(track => track.stop());
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
       pararTimerGravacao();
       removerJanelaFlutuante();
       // Resetar todas as variáveis de estado para permitir nova gravação
@@ -750,10 +778,25 @@ async function stopRecording(cancelar = false) {
       pausaTimestamp = null;
       return { success: true };
     }
+
     mediaRecorder.stop();
     return { success: true };
   } catch (error) {
+    console.error('Erro ao parar gravação:', error);
     removerJanelaFlutuante();
+    // Limpa recursos em caso de erro
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
+    }
+    mediaRecorder = null;
+    audioStream = null;
+    audioChunks = [];
+    audioBlob = null;
+    audioFile = null;
+    isRecording = false;
+    isPaused = false;
+    tempoPausado = 0;
+    pausaTimestamp = null;
     return { success: false, error: error.message };
   }
 }
