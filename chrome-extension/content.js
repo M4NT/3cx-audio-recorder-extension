@@ -30,10 +30,32 @@ let tempoPausado = 0;
 let pausaTimestamp = null;
 
 // Função para criar o indicador de gravação
-function createRecordingIndicator() {}
+function createRecordingIndicator() {
+  const indicator = document.createElement('div');
+  indicator.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 9999;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  `;
+  return indicator;
+}
 
 // Função para atualizar o indicador
-function updateRecordingIndicator() {}
+function updateRecordingIndicator() {
+  if (!recordingIndicator) {
+    recordingIndicator = createRecordingIndicator();
+    document.body.appendChild(recordingIndicator);
+  }
+}
 
 // Remover qualquer elemento remanescente do tipo recordingIndicator ao iniciar gravação
 function removeOldRecordingIndicator() {
@@ -51,7 +73,7 @@ function ensureMaterialIcons() {
   }
 }
 
-// Função para criar e injetar o botão de gravação logo após o botão de template
+// Função para criar e injetar o botão de gravação
 function injectRecordButton() {
   const templateButton = document.querySelector('#templateSelector');
   if (!templateButton) {
@@ -85,6 +107,15 @@ function injectRecordButton() {
     #audioRecordButton {
       padding: 5px;
       transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
     }
     #audioRecordButton:hover {
       background-color: rgba(0, 0, 0, 0.05);
@@ -97,6 +128,77 @@ function injectRecordButton() {
       0% { opacity: 1; }
       50% { opacity: 0.5; }
       100% { opacity: 1; }
+    }
+    .floating-audio-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 16px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 300px;
+    }
+    .floating-audio-container.recording {
+      background: #fff3f3;
+    }
+    .floating-audio-container.preview {
+      background: #f8fafc;
+    }
+    .floating-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .floating-controls button {
+      padding: 8px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .floating-controls button:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .floating-timer {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+    .floating-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .floating-preview audio {
+      width: 100%;
+    }
+    .floating-preview-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .floating-preview-buttons button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .send-button {
+      background: #2196F3;
+      color: white;
+    }
+    .cancel-button {
+      background: #f44336;
+      color: white;
     }
   `;
   document.head.appendChild(style);
@@ -565,42 +667,52 @@ function removerJanelaFlutuante() {
   }
 }
 
-// Refatorar startRecording e stopRecording para usar a janela flutuante
+// Função para iniciar a gravação
 async function startRecording() {
   try {
-    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(audioStream);
+    audioStream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      } 
+    });
+    
+    mediaRecorder = new MediaRecorder(audioStream, {
+      mimeType: 'audio/webm;codecs=opus'
+    });
+    
     audioChunks = [];
+    
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
       }
     };
-    mediaRecorder.onstop = (e) => {
+    
+    mediaRecorder.onstop = () => {
       audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       audioFile = new File([audioBlob], `audio_message_${timestamp}.webm`, {
         type: 'audio/webm',
         lastModified: Date.now()
       });
+      
       audioStream.getTracks().forEach(track => track.stop());
       pararTimerGravacao();
       beep();
       atualizarJanelaFlutuante('preview', audioBlob, audioFile);
     };
-    mediaRecorder.onpause = () => {
-      if (pauseResumeButton) pauseResumeButton.innerHTML = '<span title="Despausar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>';
-    };
-    mediaRecorder.onresume = () => {
-      if (pauseResumeButton) pauseResumeButton.innerHTML = '<span title="Pausar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg></span>';
-    };
-    mediaRecorder.start();
+    
+    mediaRecorder.start(100); // Coleta dados a cada 100ms
     removerJanelaFlutuante();
     gravacaoTempo = 0;
     iniciarTimerGravacao(true);
     atualizarJanelaFlutuante('recording');
+    
     return { success: true };
   } catch (error) {
+    console.error('Erro ao iniciar gravação:', error);
     return { success: false, error: error.message };
   }
 }
