@@ -182,8 +182,9 @@ function injectRecordButton() {
   recordButton.disabled = false;
   recordButton.style.cursor = 'pointer';
 
-  // Adiciona o manipulador de evento (simplificado para garantir funcionamento)
+  // Adiciona o evento de click
   recordButton.addEventListener('click', async function() {
+    // Código existente...
     console.log('[3CX Audio Extension] Botão de gravação clicado');
     
     // Desabilita temporariamente o botão para evitar cliques múltiplos
@@ -214,12 +215,42 @@ function injectRecordButton() {
     }
   });
 
+  // Encontra o melhor local para inserir o botão
+  const chatActions = templateButton.parentNode;
+  if (!chatActions) {
+    console.log('[3CX Audio Extension] Container de ações do chat não encontrado');
+    return;
+  }
+  
+  // Otimiza o layout do container pai (se necessário)
+  if (chatActions.id === 'chat-form-controls' || chatActions.className.includes('ChatInput-ActionsContainer')) {
+    chatActions.style.display = 'flex';
+    chatActions.style.alignItems = 'center';
+    chatActions.style.flexWrap = 'nowrap';
+    
+    // Ajusta a área de texto para permitir espaço para os botões
+    const textArea = chatActions.querySelector('textarea');
+    if (textArea) {
+      textArea.style.flexGrow = '1';
+      textArea.style.minWidth = '0';
+    }
+    
+    // Também tenta ajustar qualquer wrapper de input
+    const inputWrapper = chatActions.querySelector('.ChatInput-InputWrapper');
+    if (inputWrapper) {
+      inputWrapper.style.flexGrow = '1';
+      inputWrapper.style.minWidth = '0'; 
+      inputWrapper.style.width = 'auto';
+    }
+  }
+
   // Insere o botão logo após o botão de template
   if (templateButton.nextSibling) {
     templateButton.parentNode.insertBefore(recordButton, templateButton.nextSibling);
   } else {
     templateButton.parentNode.appendChild(recordButton);
   }
+  
   console.log('[3CX Audio Extension] Botão de gravação injetado com sucesso');
 }
 
@@ -1597,7 +1628,6 @@ function reinicializarExtensao() {
 
 // Adicionar botão de reinicialização no setupObserver
 function setupObserver() {
-  // Código existente...
   console.log("[3CX Audio Extension] Configurando observador para interface do 3CX...");
 
   // Adiciona os estilos CSS imediatamente 
@@ -1609,10 +1639,58 @@ function setupObserver() {
   // Verifica e tenta injetar o botão imediatamente se possível
   injectRecordButton();
   
+  // Ajusta o layout imediatamente e depois de um pequeno intervalo
+  ajustarLayoutChat();
+  setTimeout(ajustarLayoutChat, 1000);
+  
   // Adiciona tentativa de reinicialização após 5 segundos
-  setTimeout(reinicializarExtensao, 5000);
+  setTimeout(() => {
+    reinicializarExtensao();
+    ajustarLayoutChat();
+  }, 5000);
 
-  // Resto do código existente...
+  // Configura o observador de mutações para detectar quando o chat está pronto
+  const observer = new MutationObserver(function(mutations) {
+    for (let mutation of mutations) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        // Verifica se o templateSelector está disponível
+        if (document.querySelector('#templateSelector') && !document.querySelector('#audioRecordButton')) {
+          console.log('[3CX Audio Extension] Template selector detectado, injetando botão...');
+          injectRecordButton();
+          ajustarLayoutChat();
+          
+          // Tenta obter o nome do usuário se ainda não tem
+          if (!nomeUsuarioReal) {
+            try {
+              const userElement = document.querySelector('.User-NameAndDNC');
+              if (userElement) {
+                nomeUsuarioReal = userElement.textContent.trim();
+                console.log(`[3CX Audio Extension] Nome do usuário detectado: ${nomeUsuarioReal}`);
+              }
+            } catch (e) {
+              console.log('[3CX Audio Extension] Erro ao obter nome do usuário:', e);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log("[3CX Audio Extension] Observador configurado com sucesso");
+  
+  // Backup: intervalo para verificar regularmente se o botão precisa ser injetado
+  setInterval(function() {
+    if (document.querySelector('#templateSelector') && !document.querySelector('#audioRecordButton')) {
+      console.log('[3CX Audio Extension] Verificação periódica: injetando botão...');
+      injectRecordButton();
+      ajustarLayoutChat();
+    }
+  }, 2000);
 }
 
 // Adiciona estilos CSS necessários
@@ -1624,8 +1702,9 @@ function addAudioStyles() {
   style.id = '3cx-audio-styles';
   style.textContent = `
     #audioRecordButton {
-      padding: 5px;
-      transition: all 0.3s ease;
+      padding: 6px;
+      margin: 0 2px;
+      transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1635,33 +1714,99 @@ function addAudioStyles() {
       background: transparent;
       border: none;
       cursor: pointer;
+      box-sizing: content-box;
+      flex-shrink: 0;
     }
+    
+    /* Garante que o botão tenha tamanho semelhante aos botões nativos */
+    #audioRecordButton svg {
+      width: 18px;
+      height: 18px;
+      overflow: visible;
+    }
+    
     #audioRecordButton:hover {
       background-color: rgba(0, 0, 0, 0.05);
     }
+    
     #audioRecordButton.recording .record-svg svg {
-      color: #f44336;
+      color: #f44336 !important;
       animation: pulse 1s infinite;
     }
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
+    
+    /* Ajustes para o container de chat */
+    #chat-form-controls {
+      display: flex !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      gap: 4px !important;
     }
+    
+    /* Ajuste para garantir que o área de texto tenha espaço suficiente */
+    #chat-form-controls > textarea,
+    #chat-form-controls > .ChatInput-InputWrapper {
+      flex-grow: 1 !important;
+      flex-shrink: 1 !important;
+      min-width: 0 !important;
+      width: auto !important;
+    }
+    
+    /* Garante que os botões tenham tamanho consistente */
+    #chat-form-controls > button {
+      flex-shrink: 0 !important;
+    }
+    
+    /* Estilos para a janela flutuante */
     .floating-audio-container {
       position: fixed;
       bottom: 20px;
       right: 20px;
       background: white;
       border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
       padding: 16px;
       z-index: 9999;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      min-width: 300px;
+      min-width: 280px;
+      max-width: 90vw;
     }
+    
+    /* Responsividade para dispositivos móveis */
+    @media (max-width: 768px) {
+      .floating-audio-container {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        padding: 12px;
+        min-width: auto;
+      }
+      
+      #audioRecordButton {
+        padding: 4px;
+        min-width: 28px;
+        height: 28px;
+      }
+      
+      #audioRecordButton svg {
+        width: 16px;
+        height: 16px;
+      }
+      
+      #chat-form-controls {
+        gap: 2px !important;
+        padding: 4px !important;
+      }
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    
+    /* Resto dos estilos */
     .floating-audio-container.recording {
       background: #fff3f3;
     }
@@ -1699,26 +1844,6 @@ function addAudioStyles() {
     .floating-preview audio {
       width: 100%;
     }
-    .floating-preview-buttons {
-      display: flex;
-      gap: 8px;
-    }
-    .floating-preview-buttons button {
-      flex: 1;
-      padding: 8px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .send-button {
-      background: #2196F3;
-      color: white;
-    }
-    .cancel-button {
-      background: #f44336;
-      color: white;
-    }
   `;
   document.head.appendChild(style);
   console.log('[3CX Audio Extension] Estilos CSS adicionados');
@@ -1747,8 +1872,15 @@ function setupObserver() {
   // Verifica e tenta injetar o botão imediatamente se possível
   injectRecordButton();
   
+  // Ajusta o layout imediatamente e depois de um pequeno intervalo
+  ajustarLayoutChat();
+  setTimeout(ajustarLayoutChat, 1000);
+  
   // Adiciona tentativa de reinicialização após 5 segundos
-  setTimeout(reinicializarExtensao, 5000);
+  setTimeout(() => {
+    reinicializarExtensao();
+    ajustarLayoutChat();
+  }, 5000);
 
   // Configura o observador de mutações para detectar quando o chat está pronto
   const observer = new MutationObserver(function(mutations) {
@@ -1758,6 +1890,7 @@ function setupObserver() {
         if (document.querySelector('#templateSelector') && !document.querySelector('#audioRecordButton')) {
           console.log('[3CX Audio Extension] Template selector detectado, injetando botão...');
           injectRecordButton();
+          ajustarLayoutChat();
           
           // Tenta obter o nome do usuário se ainda não tem
           if (!nomeUsuarioReal) {
@@ -1788,6 +1921,7 @@ function setupObserver() {
     if (document.querySelector('#templateSelector') && !document.querySelector('#audioRecordButton')) {
       console.log('[3CX Audio Extension] Verificação periódica: injetando botão...');
       injectRecordButton();
+      ajustarLayoutChat();
     }
   }, 2000);
 }
@@ -1883,4 +2017,47 @@ function adjustChatInputSpace() {
     // Reduz levemente a largura para acomodar o botão de áudio
     inputContainer.style.width = 'calc(100% - 40px)';
   }
+}
+
+// Função para ajustar o layout do chat para acomodar o botão de áudio
+function ajustarLayoutChat() {
+  console.log('[3CX Audio Extension] Ajustando layout do chat...');
+  
+  // Tenta encontrar o container de chat
+  const chatControls = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
+  if (!chatControls) {
+    console.log('[3CX Audio Extension] Container de chat não encontrado');
+    return;
+  }
+  
+  // Aplica estilos flex ao container
+  chatControls.style.display = 'flex';
+  chatControls.style.alignItems = 'center';
+  chatControls.style.flexWrap = 'nowrap';
+  chatControls.style.gap = '4px';
+  
+  // Ajusta todos os botões no container
+  const buttons = chatControls.querySelectorAll('button');
+  buttons.forEach(button => {
+    button.style.flexShrink = '0';
+  });
+  
+  // Ajusta a área de texto
+  const textArea = chatControls.querySelector('textarea');
+  if (textArea) {
+    textArea.style.flexGrow = '1';
+    textArea.style.flexShrink = '1';
+    textArea.style.minWidth = '0';
+  }
+  
+  // Ajusta qualquer wrapper de input
+  const inputWrapper = chatControls.querySelector('.ChatInput-InputWrapper');
+  if (inputWrapper) {
+    inputWrapper.style.flexGrow = '1';
+    inputWrapper.style.flexShrink = '1';
+    inputWrapper.style.minWidth = '0';
+    inputWrapper.style.width = 'auto';
+  }
+  
+  console.log('[3CX Audio Extension] Layout ajustado');
 }
