@@ -186,7 +186,7 @@ function injectRecordButton() {
       transform: translateY(-50%) !important;
       display: flex !important;
       align-items: center !important;
-      gap: 4px !important;
+      gap: 10px !important;
       z-index: 2 !important;
     `;
     
@@ -204,7 +204,7 @@ function injectRecordButton() {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    margin: 0 1px !important;
+    margin: 0 3px !important;
     padding: 4px !important;
     width: 28px !important;
     height: 28px !important;
@@ -1881,7 +1881,7 @@ function ajustarLayoutChat() {
       transform: translateY(-50%) !important;
       display: flex !important;
       align-items: center !important;
-      gap: 4px !important;
+      gap: 10px !important;
       z-index: 2 !important;
     `;
   }
