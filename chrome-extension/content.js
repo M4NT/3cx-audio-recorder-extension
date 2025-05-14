@@ -224,32 +224,24 @@ function injectRecordButton() {
 
     if (isRecording) {
       recordButton.title = 'Parando gravação...';
-      // recordButton.innerHTML = 'Parando...'; // Feedback visual pode ser via title ou console
       const result = await stopRecording();
       if (!result.success) {
         alert(`Erro ao parar gravação: ${result.error}`);
-        // Mantém o estado de gravação visualmente se falhar, mas permite nova tentativa
-        recordButton.classList.add('recording'); // Garante que o ícone fique vermelho
+        recordButton.classList.add('recording');
         recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
         recordButton.title = 'Parar gravação (erro anterior)';
-      } else {
-        isRecording = false;
-        recordButton.classList.remove('recording');
-        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
-        recordButton.title = 'Gravar áudio';
       }
     } else {
       recordButton.title = 'Iniciando gravação...';
-      // recordButton.innerHTML = 'Iniciando...';
       const result = await startRecording();
       if (result.success) {
         isRecording = true;
         recordButton.classList.add('recording');
-        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`; // SVG do microfone, CSS cuida da cor
+        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
         recordButton.title = 'Parar gravação';
       } else {
         alert(`Erro ao iniciar gravação: ${result.error}`);
-        isRecording = false; // Garante que o estado seja resetado
+        isRecording = false;
         recordButton.classList.remove('recording');
         recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
         recordButton.title = 'Gravar áudio (erro ao iniciar)';
@@ -678,6 +670,7 @@ function removerJanelaFlutuante() {
   stopButton = null;
   sendAudioButton = null;
   closeAudioPreviewButton = null;
+  cancelarButton = null;
   isPaused = false;
   tempoPausado = 0;
   pausaTimestamp = null;
@@ -701,11 +694,11 @@ async function startRecording() {
         autoGainControl: true,
         sampleRate: 44100,
         channelCount: 1,
-        latency: 0,
-        googEchoCancellation: true,
-        googAutoGainControl: true,
-        googNoiseSuppression: true,
-        googHighpassFilter: true
+        // latency: 0, // Removido para maior compatibilidade
+        // googEchoCancellation: true, // Removido
+        // googAutoGainControl: true,  // Removido
+        // googNoiseSuppression: true, // Removido
+        // googHighpassFilter: true    // Removido
       } 
     });
     
@@ -760,10 +753,21 @@ async function startRecording() {
     gravacaoTempo = 0;
     iniciarTimerGravacao(true);
     atualizarJanelaFlutuante('recording');
+    isRecording = true;
     
+    // Atualiza o botão principal
+    const mainRecordButton = document.querySelector('#audioRecordButton');
+    if (mainRecordButton) {
+        mainRecordButton.classList.add('recording');
+        mainRecordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+        mainRecordButton.title = 'Parar gravação';
+        mainRecordButton.disabled = false;
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Erro ao iniciar gravação:', error);
+    isRecording = false;
     // Limpa recursos em caso de erro
     if (audioStream) {
       audioStream.getTracks().forEach(track => track.stop());
@@ -773,7 +777,6 @@ async function startRecording() {
     audioChunks = [];
     audioBlob = null;
     audioFile = null;
-    isRecording = false;
     isPaused = false;
     tempoPausado = 0;
     pausaTimestamp = null;
@@ -786,12 +789,15 @@ async function stopRecording(cancelar = false) {
   try {
     if (!mediaRecorder || mediaRecorder.state === 'inactive') {
       removerJanelaFlutuante();
+      isRecording = false;
       return { success: false, error: 'Nenhuma gravação em andamento' };
     }
 
     if (cancelar) {
       mediaRecorder.onstop = null;
-      mediaRecorder.stop();
+      if (mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+      }
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
       }
@@ -809,16 +815,15 @@ async function stopRecording(cancelar = false) {
       pausaTimestamp = null;
       return { success: true };
     }
-
-    mediaRecorder.stop();
+    
+    if (mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
     return { success: true };
   } catch (error) {
     console.error('Erro ao parar gravação:', error);
+    pararTimerGravacao();
     removerJanelaFlutuante();
-    // Limpa recursos em caso de erro
-    if (audioStream) {
-      audioStream.getTracks().forEach(track => track.stop());
-    }
     mediaRecorder = null;
     audioStream = null;
     audioChunks = [];
