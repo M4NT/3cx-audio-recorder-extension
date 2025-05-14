@@ -627,10 +627,47 @@ function removerJanelaFlutuante() {
   }
 }
 
+// Função para verificar dispositivos de áudio disponíveis
+async function verificarDispositivosAudio() {
+  try {
+    console.log('[3CX Audio Extension] Verificando dispositivos de áudio disponíveis...');
+    
+    // Verifica se o navegador suporta a API de enumeração de dispositivos
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      console.error('[3CX Audio Extension] API de enumeração de dispositivos não suportada');
+      return false;
+    }
+    
+    // Obtém a lista de dispositivos
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    
+    // Filtra apenas os dispositivos de entrada de áudio (microfones)
+    const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+    
+    console.log(`[3CX Audio Extension] Dispositivos de áudio encontrados: ${audioInputDevices.length}`);
+    
+    if (audioInputDevices.length === 0) {
+      console.error('[3CX Audio Extension] Nenhum dispositivo de áudio encontrado');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('[3CX Audio Extension] Erro ao verificar dispositivos de áudio:', error);
+    return false;
+  }
+}
+
 // Função para iniciar a gravação
 async function startRecording() {
   try {
     console.log('[3CX Audio Extension] Iniciando gravação...');
+    
+    // Verifica primeiro se há dispositivos disponíveis
+    const dispositivosDisponiveis = await verificarDispositivosAudio();
+    if (!dispositivosDisponiveis) {
+      throw new Error('Nenhum microfone encontrado. Verifique se há um microfone conectado e funcionando no seu computador.');
+    }
     
     // Mostra algum feedback visual imediato para o usuário
     const mainRecordButton = document.querySelector('#audioRecordButton');
@@ -639,10 +676,15 @@ async function startRecording() {
       mainRecordButton.title = 'Iniciando gravação...';
     }
     
-    // Solicita o stream de áudio com configurações simplificadas
-    audioStream = await navigator.mediaDevices.getUserMedia({ 
-      audio: true 
-    });
+    // Tenta obter acesso ao microfone com diferentes configurações
+    const acessoMicrofone = await tentarAcessarMicrofone();
+    if (!acessoMicrofone.success) {
+      throw acessoMicrofone.error || new Error('Não foi possível acessar o microfone.');
+    }
+    
+    // Tenta novamente com a configuração que funcionou para iniciar a gravação
+    console.log('[3CX Audio Extension] Solicitando stream de áudio para gravação...');
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
     // Detecta o melhor formato suportado
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
@@ -710,6 +752,17 @@ async function startRecording() {
   } catch (error) {
     console.error('[3CX Audio Extension] Erro ao iniciar gravação:', error);
     
+    let mensagemErro = error.message;
+    
+    // Mensagens de erro mais amigáveis
+    if (error.name === 'NotFoundError' || error.message.includes('Requested device not found')) {
+      mensagemErro = 'Nenhum microfone encontrado. Verifique se há um microfone conectado e funcionando no seu computador.';
+    } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      mensagemErro = 'Permissão para usar o microfone foi negada. Clique no ícone da câmera/cadeado na barra de endereço e permita o acesso ao microfone.';
+    } else if (error.name === 'NotReadableError' || error.message.includes('Could not start audio source')) {
+      mensagemErro = 'Não foi possível acessar o microfone. Ele pode estar sendo usado por outro aplicativo ou ter um problema de hardware.';
+    }
+    
     // Se houve erro, tenta reinicializar a extensão
     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
       console.log('[3CX Audio Extension] Problema de permissão detectado, tentando reinicializar...');
@@ -740,7 +793,7 @@ async function startRecording() {
       mainRecordButton.disabled = false;
     }
     
-    return { success: false, error: error.message };
+    return { success: false, error: mensagemErro };
   }
 }
 
@@ -1372,34 +1425,81 @@ function verificarSuporteGravação() {
   return true;
 }
 
-// Função para solicitar permissão de áudio
+// Função para tentar acessar dispositivos de áudio com diferentes configurações
+async function tentarAcessarMicrofone() {
+  const configsParaTentar = [
+    { audio: true },
+    { audio: { echoCancellation: false } },
+    { audio: { autoGainControl: false } },
+    { audio: { noiseSuppression: false } },
+    { audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false } }
+  ];
+  
+  console.log('[3CX Audio Extension] Tentando acessar microfone com diferentes configurações...');
+  
+  let ultimoErro = null;
+  
+  for (const config of configsParaTentar) {
+    try {
+      console.log(`[3CX Audio Extension] Tentando configuração: ${JSON.stringify(config)}`);
+      const stream = await navigator.mediaDevices.getUserMedia(config);
+      
+      // Se conseguiu obter o stream, verifica se tem faixas de áudio
+      if (stream && stream.getAudioTracks().length > 0) {
+        console.log('[3CX Audio Extension] Acesso ao microfone bem-sucedido!');
+        // Importante: libera o stream após o teste para não manter o microfone ocupado
+        stream.getTracks().forEach(track => track.stop());
+        return { success: true };
+      } else {
+        console.log('[3CX Audio Extension] Stream obtido, mas sem faixas de áudio');
+        if (stream) stream.getTracks().forEach(track => track.stop());
+      }
+    } catch (error) {
+      console.log(`[3CX Audio Extension] Falha na configuração com erro: ${error.name} - ${error.message}`);
+      ultimoErro = error;
+    }
+  }
+  
+  // Se chegou aqui, todas as tentativas falharam
+  return { 
+    success: false, 
+    error: ultimoErro || new Error('Não foi possível acessar o microfone com nenhuma configuração')
+  };
+}
+
+// Função para solicitar permissão de áudio com tentativas alternativas
 async function solicitarPermissaoAudio() {
   try {
     console.log('[3CX Audio Extension] Solicitando permissão de áudio...');
     
-    // Tenta obter o stream com opções simplificadas primeiro
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      audio: true
-    });
+    // Tenta acessar o microfone com diferentes configurações
+    const resultado = await tentarAcessarMicrofone();
     
-    // Se conseguir o stream, agora tenta com as configurações completas
-    stream.getTracks().forEach(track => track.stop()); // Libera o microfone
-    
-    console.log('[3CX Audio Extension] Permissão de áudio concedida!');
-    return true;
-  } catch (error) {
-    console.error('[3CX Audio Extension] Erro ao solicitar permissão de áudio:', error);
-    if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-        mensagemStatusGravacao = 'Nenhum microfone encontrado. Verifique se um microfone está conectado e habilitado.';
-    } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do seu navegador.';
-    } else if (error.name === 'AbortError') {
-        mensagemStatusGravacao = 'Solicitação de permissão de microfone abortada.';
-    } else if (error.name === 'NotReadableError') {
-        mensagemStatusGravacao = 'O microfone está sendo usado por outro aplicativo ou houve um erro de hardware.';
+    if (resultado.success) {
+      console.log('[3CX Audio Extension] Permissão de áudio concedida!');
+      return true;
     } else {
-        mensagemStatusGravacao = `Erro de acesso ao microfone: ${error.name} - ${error.message}`;
+      if (resultado.error) {
+        console.error('[3CX Audio Extension] Erro ao solicitar permissão de áudio:', resultado.error);
+        if (resultado.error.name === 'NotFoundError' || resultado.error.name === 'DevicesNotFoundError') {
+          mensagemStatusGravacao = 'Nenhum microfone encontrado. Verifique se um microfone está conectado e habilitado.';
+        } else if (resultado.error.name === 'NotAllowedError' || resultado.error.name === 'PermissionDeniedError') {
+          mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do seu navegador.';
+        } else if (resultado.error.name === 'AbortError') {
+          mensagemStatusGravacao = 'Solicitação de permissão de microfone abortada.';
+        } else if (resultado.error.name === 'NotReadableError') {
+          mensagemStatusGravacao = 'O microfone está sendo usado por outro aplicativo ou houve um erro de hardware.';
+        } else {
+          mensagemStatusGravacao = `Erro de acesso ao microfone: ${resultado.error.name} - ${resultado.error.message}`;
+        }
+      } else {
+        mensagemStatusGravacao = 'Não foi possível acessar o microfone por motivo desconhecido.';
+      }
+      return false;
     }
+  } catch (error) {
+    console.error('[3CX Audio Extension] Erro inesperado ao solicitar permissão de áudio:', error);
+    mensagemStatusGravacao = `Erro inesperado: ${error.message}`;
     return false;
   }
 }
@@ -1409,6 +1509,7 @@ async function inicializarExtensao() {
   console.log('[3CX Audio Extension] Iniciando verificação de suporte e permissões...');
   
   let suporteOk = verificarSuporteGravação();
+  let dispositivosOk = false;
   let permissaoOk = false;
 
   if (!suporteOk) {
@@ -1418,30 +1519,39 @@ async function inicializarExtensao() {
   } else {
     console.log('[3CX Audio Extension] Suporte de gravação verificado com sucesso');
     
-    // Verifica o estado atual da permissão antes de solicitar
-    const permissionState = await verificarPermissaoDeMicrofone();
+    // Verifica se existem dispositivos de áudio
+    dispositivosOk = await verificarDispositivosAudio();
     
-    // Já tem permissão
-    if (permissionState === true) {
-      permissaoOk = true;
-      gravacaoDisponivel = true;
-      mensagemStatusGravacao = 'Gravação de áudio pronta.';
-    } 
-    // Permissão negada anteriormente 
-    else if (permissionState === false) {
-      permissaoOk = false;
+    if (!dispositivosOk) {
+      mensagemStatusGravacao = 'Nenhum microfone encontrado. Verifique se há um microfone conectado ao seu computador.';
+      console.error('[3CX Audio Extension] Falha na verificação de dispositivos: ', mensagemStatusGravacao);
       gravacaoDisponivel = false;
-      mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do navegador.';
-    } 
-    // Permissão desconhecida ou nunca solicitada
-    else {
-      permissaoOk = await solicitarPermissaoAudio();
-      if (!permissaoOk) {
-        console.error(`[3CX Audio Extension] Falha na permissão de áudio: ${mensagemStatusGravacao}`);
-        gravacaoDisponivel = false;
-      } else {
+    } else {
+      // Verifica o estado atual da permissão antes de solicitar
+      const permissionState = await verificarPermissaoDeMicrofone();
+      
+      // Já tem permissão
+      if (permissionState === true) {
+        permissaoOk = true;
         gravacaoDisponivel = true;
         mensagemStatusGravacao = 'Gravação de áudio pronta.';
+      } 
+      // Permissão negada anteriormente 
+      else if (permissionState === false) {
+        permissaoOk = false;
+        gravacaoDisponivel = false;
+        mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do navegador.';
+      } 
+      // Permissão desconhecida ou nunca solicitada
+      else {
+        permissaoOk = await solicitarPermissaoAudio();
+        if (!permissaoOk) {
+          console.error(`[3CX Audio Extension] Falha na permissão de áudio: ${mensagemStatusGravacao}`);
+          gravacaoDisponivel = false;
+        } else {
+          gravacaoDisponivel = true;
+          mensagemStatusGravacao = 'Gravação de áudio pronta.';
+        }
       }
     }
   }
@@ -1464,7 +1574,7 @@ async function inicializarExtensao() {
     }
   }
   
-  console.log(`[3CX Audio Extension] Inicialização completa. Gravação disponível: ${gravacaoDisponivel}`);
+  console.log(`[3CX Audio Extension] Inicialização completa. Gravação disponível: ${gravacaoDisponivel}, Motivo: ${mensagemStatusGravacao}`);
 }
 
 // Inicia a extensão quando o DOM estiver pronto
