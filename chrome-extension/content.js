@@ -178,22 +178,20 @@ function injectRecordButton() {
     actionButtonsGroup = document.createElement('div');
     actionButtonsGroup.className = 'action-buttons-group';
     
-    // Posiciona o grupo de botões no lado direito
+    // Posiciona o grupo de botões no lado direito absoluto
     actionButtonsGroup.style.cssText = `
-      display: inline-flex !important;
+      position: absolute !important;
+      right: 12px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      display: flex !important;
       align-items: center !important;
-      gap: 1px !important;
-      flex-shrink: 0 !important;
-      margin-left: auto !important;
+      gap: 4px !important;
+      z-index: 2 !important;
     `;
     
-    // Tenta inserir após o campo de texto
-    const textInput = chatContainer.querySelector('textarea, .ChatInput-TextArea, [contenteditable="true"]');
-    if (textInput) {
-      textInput.after(actionButtonsGroup);
-    } else {
-      chatContainer.appendChild(actionButtonsGroup);
-    }
+    // Adiciona ao container de chat
+    chatContainer.appendChild(actionButtonsGroup);
   }
 
   // Cria o botão com a mesma estrutura dos outros botões do 3CX
@@ -253,7 +251,6 @@ function injectRecordButton() {
     }
   });
 
-  // Mover os botões para o grupo de ações (DIREITA)
   // Adicionar botão de gravação ao grupo
   actionButtonsGroup.appendChild(recordButton);
   
@@ -267,6 +264,18 @@ function injectRecordButton() {
   const emojiButton = chatContainer.querySelector('button[title*="emoji" i], button[title*="Emoji"]');
   if (emojiButton && emojiButton.parentNode !== actionButtonsGroup) {
     actionButtonsGroup.appendChild(emojiButton);
+  }
+  
+  // Encontra o campo de texto e garante que ele tenha espaço para os botões
+  const textInput = chatContainer.querySelector('textarea, .ChatInput-TextArea, [contenteditable="true"]');
+  if (textInput) {
+    textInput.style.cssText = `
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      width: calc(100% - 120px) !important;
+      margin-right: 120px !important;
+      box-sizing: border-box !important;
+    `;
   }
   
   console.log('[3CX Audio Extension] Botão de gravação injetado com sucesso');
@@ -1844,6 +1853,7 @@ function ajustarLayoutChat() {
     width: 100% !important;
     flex-wrap: nowrap !important;
     box-sizing: border-box !important;
+    position: relative !important;
   `;
 
   // Encontra o campo de texto e garante que ele tenha flexibilidade
@@ -1852,7 +1862,27 @@ function ajustarLayoutChat() {
     textInput.style.cssText = `
       flex: 1 1 auto !important;
       min-width: 0 !important;
-      margin-right: 8px !important;
+      width: 100% !important;
+      margin-right: 120px !important; /* Espaço para os botões */
+      box-sizing: border-box !important;
+      display: block !important;
+      position: relative !important;
+      z-index: 1 !important;
+    `;
+  }
+
+  // Ajusta o posicionamento do grupo de ação para ficar à direita absoluto
+  const actionButtonsGroup = chatControls.querySelector('.action-buttons-group');
+  if (actionButtonsGroup) {
+    actionButtonsGroup.style.cssText = `
+      position: absolute !important;
+      right: 12px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      z-index: 2 !important;
     `;
   }
   
@@ -1885,13 +1915,37 @@ function ajustarLayoutChat() {
   });
   
   // Remover textos i18n que possam estar aparecendo incorretamente (com menos seletores)
-  const i18nTexts = chatControls.querySelectorAll('span, div');
+  // Busca por textos soltos que contenham i18n
+  Array.from(chatControls.childNodes).forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent.trim();
+      if (text && (text.includes('i18n.') || text.includes('SAY_SOMET'))) {
+        node.textContent = '';
+      }
+    }
+  });
+
+  const i18nTexts = chatControls.querySelectorAll('span, div, label');
   i18nTexts.forEach(el => {
     if (el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE) {
       const text = el.textContent.trim();
       if (text && (text.includes('i18n.') || text.includes('SAY_SOMET'))) {
         el.style.display = 'none';
       }
+    }
+  });
+
+  // Procura por placeholders
+  const placeholders = chatControls.querySelectorAll('[placeholder], [data-placeholder], [aria-placeholder]');
+  placeholders.forEach(input => {
+    const placeholder = input.getAttribute('placeholder') || 
+                        input.getAttribute('data-placeholder') || 
+                        input.getAttribute('aria-placeholder');
+    
+    if (placeholder && (placeholder.includes('i18n.') || placeholder.includes('SAY_SOMET'))) {
+      input.setAttribute('placeholder', '');
+      input.setAttribute('data-placeholder', '');
+      input.setAttribute('aria-placeholder', '');
     }
   });
 }
@@ -1913,20 +1967,21 @@ function correcaoEmergenciaLayout() {
       flex-wrap: nowrap !important;
       width: 100% !important;
       box-sizing: border-box !important;
-    }
-    
-    /* Esconder elementos i18n incorretos de forma mais seletiva */
-    span:empty, div:empty {
-      display: none !important;
+      position: relative !important;
     }
     
     #chat-form-controls textarea, 
     .ChatInput-ActionsContainer textarea,
     #chat-form-controls [contenteditable="true"], 
-    .ChatInput-ActionsContainer [contenteditable="true"] {
+    .ChatInput-ActionsContainer [contenteditable="true"],
+    #chat-form-controls [role="textbox"],
+    .ChatInput-ActionsContainer [role="textbox"] {
       flex: 1 1 auto !important;
       min-width: 0 !important;
-      margin-right: 8px !important;
+      width: 100% !important;
+      margin-right: 120px !important; /* Espaço para os botões */
+      box-sizing: border-box !important;
+      display: block !important;
     }
     
     #chat-form-controls > button, 
@@ -1958,13 +2013,27 @@ function correcaoEmergenciaLayout() {
       box-sizing: content-box !important;
     }
     
-    /* Corrigir posicionamento da action-buttons-group */
+    /* Posicionamento absoluto da action-buttons-group */
     .action-buttons-group {
-      display: inline-flex !important;
+      position: absolute !important;
+      right: 12px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      display: flex !important;
       align-items: center !important;
-      justify-content: flex-end !important;
-      flex-shrink: 0 !important;
-      margin-left: auto !important;
+      gap: 4px !important;
+      z-index: 2 !important;
+    }
+    
+    /* Ocultar textos i18n */
+    [class*="placeholder"], [class*="Placeholder"] {
+      color: transparent !important;
+      font-size: 0 !important;
+    }
+    
+    /* Remover texto i18n.SAY_SOMETHING */
+    *:contains('i18n.SAY_SOMET') {
+      display: none !important;
     }
   `;
   
@@ -1975,6 +2044,21 @@ function correcaoEmergenciaLayout() {
   // Adiciona o novo estilo
   styleElement.id = '3cx-emergency-style';
   document.head.appendChild(styleElement);
+
+  // Tenta remover textos i18n diretamente
+  try {
+    document.querySelectorAll('span, div, label').forEach(el => {
+      if (el.textContent && (el.textContent.includes('i18n.') || el.textContent.includes('SAY_SOMET'))) {
+        el.style.display = 'none';
+        el.style.fontSize = '0';
+        el.style.height = '0';
+        el.style.width = '0';
+        el.style.overflow = 'hidden';
+      }
+    });
+  } catch (e) {
+    console.error('[3CX Audio Extension] Erro ao limpar textos i18n:', e);
+  }
 }
 
 // Adicionar CSS global para garantir o layout correto
@@ -1992,6 +2076,7 @@ function correcaoEmergenciaLayout() {
       flex-wrap: nowrap !important;
       width: 100% !important;
       box-sizing: border-box !important;
+      position: relative !important;
     }
     
     /* Campo de entrada com flex adequado */
@@ -2003,7 +2088,9 @@ function correcaoEmergenciaLayout() {
     .ChatInput-ActionsContainer div[role="textbox"] {
       flex: 1 1 auto !important;
       min-width: 0 !important;
-      margin-right: 8px !important;
+      width: calc(100% - 120px) !important; 
+      margin-right: 120px !important;
+      box-sizing: border-box !important;
     }
     
     /* Garantir que os botões apareçam compactos */
@@ -2048,11 +2135,14 @@ function correcaoEmergenciaLayout() {
     
     /* Contêiner para grupo de botões para garantir que fiquem juntos no lado direito */
     .action-buttons-group {
-      display: inline-flex !important;
+      position: absolute !important;
+      right: 12px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      display: flex !important;
       align-items: center !important;
-      gap: 1px !important;
-      flex-shrink: 0 !important;
-      margin-left: auto !important;
+      gap: 4px !important;
+      z-index: 2 !important;
     }
     
     /* Esconder seletivamente textos i18n */
@@ -2060,9 +2150,30 @@ function correcaoEmergenciaLayout() {
       display: none !important;
     }
     
+    /* Ocultar texto i18n.SAY_SOMETHING */
+    [data-qa="input_restriction"] {
+      color: transparent !important;
+      font-size: 0 !important;
+      position: absolute !important;
+      width: 0 !important;
+      height: 0 !important;
+      overflow: hidden !important;
+      visibility: hidden !important;
+    }
+    
     @media (max-width: 480px) {
       #chat-form-controls, .ChatInput-ActionsContainer {
         padding: 4px 8px !important;
+      }
+      
+      #chat-form-controls textarea, 
+      .ChatInput-ActionsContainer textarea,
+      #chat-form-controls [contenteditable="true"], 
+      .ChatInput-ActionsContainer [contenteditable="true"],
+      #chat-form-controls div[role="textbox"], 
+      .ChatInput-ActionsContainer div[role="textbox"] {
+        margin-right: 100px !important;
+        width: calc(100% - 100px) !important;
       }
       
       #chat-form-controls > button,
@@ -2085,152 +2196,130 @@ function correcaoEmergenciaLayout() {
   document.head.appendChild(styleElement);
 })();
 
-// Simplificado: remover textos i18n problemáticos
-function ocultarPlaceholdersI18n() {
-  try {
-    // Limitamos a busca apenas dentro do container de chat para evitar recarregamentos
-    const chatContainer = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
-    if (!chatContainer) return;
+// Função simplificada para injetar o botão de gravação
+function injectRecordButton() {
+  // Verifica se o botão já existe
+  if (document.querySelector('#audioRecordButton')) {
+    return;
+  }
+
+  // Tenta encontrar o botão de template para referência
+  const templateButton = document.querySelector('#templateSelector, .template-button');
+  if (!templateButton) {
+    return;
+  }
+
+  // Encontra o container de chat
+  const chatContainer = templateButton.closest('#chat-form-controls, .ChatInput-ActionsContainer');
+  if (!chatContainer) {
+    return;
+  }
+
+  // Cria o contêiner para os botões se não existir
+  let actionButtonsGroup = chatContainer.querySelector('.action-buttons-group');
+  if (!actionButtonsGroup) {
+    actionButtonsGroup = document.createElement('div');
+    actionButtonsGroup.className = 'action-buttons-group';
     
-    // Procura apenas por textos diretos no container
-    const childNodes = Array.from(chatContainer.childNodes);
-    childNodes.forEach(node => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent.trim();
-        if (text && (text.includes('i18n.') || text.includes('SAY_SOMET'))) {
-          node.textContent = '';
-        }
-      }
-    });
+    // Posiciona o grupo de botões no lado direito absoluto
+    actionButtonsGroup.style.cssText = `
+      position: absolute !important;
+      right: 12px !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      z-index: 2 !important;
+    `;
     
-    // Limitamos a busca a elementos span e div diretos
-    const elements = chatContainer.querySelectorAll('span, div');
-    elements.forEach(el => {
-      if (el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE) {
-        const text = el.textContent.trim();
-        if (text && (text.includes('i18n.') || text.includes('SAY_SOMET'))) {
-          el.style.display = 'none';
+    // Adiciona ao container de chat
+    chatContainer.appendChild(actionButtonsGroup);
+  }
+
+  // Cria o botão com a mesma estrutura dos outros botões do 3CX
+  const recordButton = document.createElement('button');
+  recordButton.type = 'button';
+  recordButton.id = 'audioRecordButton';
+  recordButton.className = 'btn btn-plain'; // Usa a classe padrão dos botões do 3CX
+  recordButton.title = 'Gravar áudio';
+  recordButton.style.cssText = `
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 1px !important;
+    padding: 4px !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    flex: 0 0 auto !important;
+    box-sizing: content-box !important;
+  `;
+  recordButton.innerHTML = `
+    <span class="record-svg" style="display:inline-flex;align-items:center;justify-content:center;">
+      ${SVG_MIC_CONTENT}
+    </span>
+  `;
+
+  // Adiciona o evento de click
+  recordButton.addEventListener('click', async function() {
+    console.log('[3CX Audio Extension] Botão de gravação clicado');
+    
+    // Desabilita temporariamente para evitar cliques múltiplos
+    recordButton.disabled = true;
+    
+    try {
+      if (isRecording) {
+        // Se estiver gravando, para a gravação
+        console.log('[3CX Audio Extension] Parando gravação...');
+        recordButton.title = 'Parando gravação...';
+        await stopRecording();
+      } else {
+        // Inicia nova gravação
+        console.log('[3CX Audio Extension] Iniciando gravação...');
+        recordButton.title = 'Iniciando gravação...';
+        const result = await startRecording();
+        
+        if (!result.success) {
+          alert(`Erro ao iniciar gravação: ${result.error}`);
         }
       }
-    });
-  } catch (e) {
-    console.error('[3CX Audio Extension] Erro ao ocultar placeholders:', e);
-  }
-}
-
-// Adiciona um observer para executar o ocultamento de placeholders periodicamente
-const i18nObserver = new MutationObserver(() => {
-  ocultarPlaceholdersI18n();
-});
-
-// Executa a função inicialmente e configura o observer
-document.addEventListener('DOMContentLoaded', () => {
-  ocultarPlaceholdersI18n();
-  i18nObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
-});
-
-// Também executa agora se o DOM já estiver pronto
-if (document.readyState !== 'loading') {
-  ocultarPlaceholdersI18n();
-  i18nObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
-}
-
-// Intervalo para garantir que o texto seja continuamente removido
-setInterval(ocultarPlaceholdersI18n, 1000);
-
-// Remova o observer global que pode estar causando recarregamentos
-if (typeof i18nObserver !== 'undefined' && i18nObserver) {
-  i18nObserver.disconnect();
-}
-
-// Substitua por um observer mais limitado que observa apenas mudanças relevantes
-const chatObserver = new MutationObserver((mutations) => {
-  let shouldAdjust = false;
-  
-  // Verificar apenas se há mudanças relevantes para evitar loops infinitos
-  for (const mutation of mutations) {
-    // Verifica apenas adição de nós
-    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-      for (let i = 0; i < mutation.addedNodes.length; i++) {
-        const node = mutation.addedNodes[i];
-        // Só nos interessam elementos HTML
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          // Verificar se é um container de chat ou botão relevante
-          if (node.id === 'chat-form-controls' || 
-              node.className?.includes('ChatInput') || 
-              node.tagName === 'BUTTON') {
-            shouldAdjust = true;
-            break;
-          }
-        }
-      }
+    } catch (error) {
+      console.error('[3CX Audio Extension] Erro ao manipular clique no botão:', error);
+      alert('Ocorreu um erro ao processar o áudio. Por favor, tente novamente.');
+    } finally {
+      // Sempre reabilita o botão ao final
+      recordButton.disabled = false;
     }
-    if (shouldAdjust) break;
+  });
+
+  // Adicionar botão de gravação ao grupo
+  actionButtonsGroup.appendChild(recordButton);
+  
+  // Adicionar outros botões ao grupo para garantir que fiquem juntos
+  const paperclipButton = chatContainer.querySelector('button[app-paperclip-light-icon], button[title*="Anexar"], button[aria-label*="Anexar"]');
+  if (paperclipButton && paperclipButton.parentNode !== actionButtonsGroup) {
+    actionButtonsGroup.appendChild(paperclipButton);
   }
   
-  // Só executa se for realmente necessário
-  if (shouldAdjust) {
-    console.log('[3CX Audio Extension] Ajustando layout após mudança no DOM');
-    ajustarLayoutChat();
-    ocultarPlaceholdersI18n();
-  }
-});
-
-// Inicializa observação apenas do container de chat
-function inicializarObservacao() {
-  // Certifica-se de observar apenas o container de chat quando disponível
-  const chatContainer = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
-  if (chatContainer) {
-    chatObserver.observe(chatContainer, { 
-      childList: true,
-      subtree: true
-    });
-    console.log('[3CX Audio Extension] Observador de chat inicializado');
+  // Verificar se há botão de emoji e movê-lo também
+  const emojiButton = chatContainer.querySelector('button[title*="emoji" i], button[title*="Emoji"]');
+  if (emojiButton && emojiButton.parentNode !== actionButtonsGroup) {
+    actionButtonsGroup.appendChild(emojiButton);
   }
   
-  // Aplicar ajustes imediatamente
-  ajustarLayoutChat();
-  ocultarPlaceholdersI18n();
-}
-
-// Configura a inicialização
-document.addEventListener('DOMContentLoaded', () => {
-  // Pequeno atraso para permitir que a página carregue primeiro
-  setTimeout(() => {
-    inicializarObservacao();
-    correcaoEmergenciaLayout();
-  }, 500);
-});
-
-// Também inicializa se o DOM já estiver pronto
-if (document.readyState !== 'loading') {
-  setTimeout(() => {
-    inicializarObservacao();
-    correcaoEmergenciaLayout();
-  }, 500);
-}
-
-// Limita a execução do intervalo para reduzir o impacto de performance
-let lastCheck = 0;
-setInterval(() => {
-  const now = Date.now();
-  // Verifica no máximo a cada 2 segundos
-  if (now - lastCheck > 2000) {
-    lastCheck = now;
-    ajustarLayoutChat();
-    // Reaplica os ajustes de layout
-    const chatContainer = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
-    if (chatContainer && !document.querySelector('#audioRecordButton')) {
-      console.log('[3CX Audio Extension] Verificação periódica: injetando botão...');
-      injectRecordButton();
-    }
+  // Encontra o campo de texto e garante que ele tenha espaço para os botões
+  const textInput = chatContainer.querySelector('textarea, .ChatInput-TextArea, [contenteditable="true"]');
+  if (textInput) {
+    textInput.style.cssText = `
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      width: calc(100% - 120px) !important;
+      margin-right: 120px !important;
+      box-sizing: border-box !important;
+    `;
   }
-}, 2000);
+  
+  console.log('[3CX Audio Extension] Botão de gravação injetado com sucesso');
+}
