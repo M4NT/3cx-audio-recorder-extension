@@ -2323,3 +2323,90 @@ function injectRecordButton() {
   
   console.log('[3CX Audio Extension] Botão de gravação injetado com sucesso');
 }
+
+// Remova o observer global que pode estar causando recarregamentos
+if (typeof i18nObserver !== 'undefined' && i18nObserver) {
+  i18nObserver.disconnect();
+}
+
+// Substitua por um observer mais limitado que observa apenas mudanças relevantes
+const chatObserver = new MutationObserver((mutations) => {
+  let shouldAdjust = false;
+  
+  // Verificar apenas se há mudanças relevantes para evitar loops infinitos
+  for (const mutation of mutations) {
+    // Verifica apenas adição de nós
+    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+      for (let i = 0; i < mutation.addedNodes.length; i++) {
+        const node = mutation.addedNodes[i];
+        // Só nos interessam elementos HTML
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Verificar se é um container de chat ou botão relevante
+          if (node.id === 'chat-form-controls' || 
+              node.className?.includes('ChatInput') || 
+              node.tagName === 'BUTTON') {
+            shouldAdjust = true;
+            break;
+          }
+        }
+      }
+    }
+    if (shouldAdjust) break;
+  }
+  
+  // Só executa se for realmente necessário
+  if (shouldAdjust) {
+    console.log('[3CX Audio Extension] Ajustando layout após mudança no DOM');
+    ajustarLayoutChat();
+  }
+});
+
+// Função para garantir o monitoramento do layout
+function iniciarMonitorLayout() {
+  // Aplica ajustes imediatamente
+  ajustarLayoutChat();
+  correcaoEmergenciaLayout();
+  
+  // Configura o observer para monitorar mudanças no DOM
+  const chatContainer = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
+  if (chatContainer) {
+    chatObserver.observe(chatContainer, {
+      childList: true,
+      subtree: true,
+    });
+    console.log('[3CX Audio Extension] Monitor de layout inicializado');
+  }
+
+  // Continua aplicando em intervalos mais frequentes
+  setInterval(() => {
+    ajustarLayoutChat();
+  }, 2000);
+
+  // Adiciona monitor de resize da janela
+  window.addEventListener('resize', () => {
+    ajustarLayoutChat();
+  });
+}
+
+// Inicializar o monitor quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    iniciarMonitorLayout();
+  }, 500);
+});
+
+// Se o DOM já estiver carregado, inicializa imediatamente
+if (document.readyState === 'interactive' || document.readyState === 'complete') {
+  setTimeout(() => {
+    iniciarMonitorLayout();
+  }, 500);
+}
+
+// Fallback simples para manter os ajustes funcionando
+setInterval(() => {
+  // Garante que os botões estão presentes
+  ensureRecordButton();
+  
+  // Reaplica os ajustes a cada 3 segundos
+  ajustarLayoutChat();
+}, 3000);
