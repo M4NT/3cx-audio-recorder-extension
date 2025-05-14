@@ -153,82 +153,158 @@ async function verificarPermissaoDeMicrofone() {
   }
 }
 
-// Função simplificada para injetar o botão de gravação
+// Função para criar e injetar o botão de gravação
 function injectRecordButton() {
-  // Verifica se o botão já existe
-  if (document.querySelector('#audioRecordButton')) {
-    return;
-  }
+  console.log("[3CX Audio Extension] Tentando injetar botão de gravação...");
 
-  // Tenta encontrar o botão de template para referência
-  const templateButton = document.querySelector('#templateSelector, .template-button');
+  // Tenta encontrar o botão de template ou outro botão para usar como referência
+  const templateButton = document.querySelector('#templateSelector, .template-button, button.emoji-button, button[title*="emoji"], button[aria-label*="emoji"]');
   if (!templateButton) {
-    return;
-  }
-
-  // Encontra o container de chat
-  const chatContainer = templateButton.closest('#chat-form-controls, .ChatInput-ActionsContainer');
-  if (!chatContainer) {
-    return;
-  }
-
-  // Cria o contêiner para os botões se não existir
-  let actionButtonsGroup = chatContainer.querySelector('.action-buttons-group');
-  if (!actionButtonsGroup) {
-    actionButtonsGroup = document.createElement('div');
-    actionButtonsGroup.className = 'action-buttons-group';
+    console.log('[3CX Audio Extension] Botão de referência não encontrado, tentando alternativas...');
+    // Se não encontrar o botão de template, tenta outras referências
+    const chatControls = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
+    if (!chatControls) {
+      console.log('[3CX Audio Extension] Container de chat não encontrado');
+      return;
+    }
     
-    // Tenta inserir após o campo de texto
-    const textInput = chatContainer.querySelector('textarea, .ChatInput-TextArea, [contenteditable="true"]');
-    if (textInput) {
-      textInput.after(actionButtonsGroup);
+    // Verifica se o botão já existe para evitar duplicação
+    if (document.querySelector('#audioRecordButton')) {
+      console.log('[3CX Audio Extension] Botão de gravação já existe');
+      return;
+    }
+    
+    // Tenta encontrar qualquer botão ou elemento para usar como referência
+    const anyButton = chatControls.querySelector('button');
+    if (anyButton) {
+      console.log('[3CX Audio Extension] Usando outro botão como referência');
+      
+      // Cria o botão de gravação
+      recordButton = document.createElement('button');
+      recordButton.type = 'button';
+      recordButton.id = 'audioRecordButton';
+      recordButton.className = anyButton.className; // Usa a mesma classe do botão de referência
+      recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+      recordButton.title = 'Gravar áudio';
+      recordButton.disabled = false;
+      
+      // Aplica estilos
+      applyRecordButtonStyles(recordButton);
+      
+      // Adiciona o evento de click
+      addRecordButtonClickEvent(recordButton);
+      
+      // Insere o botão no início do container
+      chatControls.insertBefore(recordButton, chatControls.firstChild);
+      console.log('[3CX Audio Extension] Botão inserido no início do container');
+      return;
     } else {
-      chatContainer.appendChild(actionButtonsGroup);
+      console.log('[3CX Audio Extension] Nenhum botão encontrado no container');
+      return;
     }
   }
 
-  // Cria o botão com a mesma estrutura dos outros botões do 3CX
-  const recordButton = document.createElement('button');
+  // Verifica se o botão já existe para evitar duplicação
+  if (document.querySelector('#audioRecordButton')) {
+    console.log('[3CX Audio Extension] Botão de gravação já existe');
+    return;
+  }
+
+  console.log('[3CX Audio Extension] Criando botão de gravação...');
+
+  // Encontra o container pai
+  const chatContainer = templateButton.closest('#chat-form-controls, .ChatInput-ActionsContainer');
+  if (!chatContainer) {
+    console.log('[3CX Audio Extension] Container de chat não encontrado');
+    return;
+  }
+
+  // Cria o botão de gravação com tamanho mínimo
+  recordButton = document.createElement('button');
   recordButton.type = 'button';
   recordButton.id = 'audioRecordButton';
-  recordButton.className = 'btn btn-plain'; // Usa a classe padrão dos botões do 3CX
+  recordButton.className = templateButton.className; // Usa a mesma classe do botão de referência
+  recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
   recordButton.title = 'Gravar áudio';
-  recordButton.style.cssText = `
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    margin: 0 1px !important;
-    padding: 4px !important;
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px !important;
-    min-height: 28px !important;
-    flex: 0 0 auto !important;
-    box-sizing: content-box !important;
-  `;
-  recordButton.innerHTML = `
-    <span class="record-svg" style="display:inline-flex;align-items:center;justify-content:center;">
-      ${SVG_MIC_CONTENT}
-    </span>
-  `;
-
+  recordButton.disabled = false;
+  
+  // Aplica estilos
+  applyRecordButtonStyles(recordButton);
+  
   // Adiciona o evento de click
-  recordButton.addEventListener('click', async function() {
+  addRecordButtonClickEvent(recordButton);
+  
+  // Primeiro ajusta o layout container para garantir espaço
+  ajustarLayoutChat();
+  
+  // Insere o botão no lugar correto (após o botão de emoji)
+  if (templateButton.nextSibling) {
+    templateButton.parentNode.insertBefore(recordButton, templateButton.nextSibling);
+  } else {
+    templateButton.parentNode.appendChild(recordButton);
+  }
+  
+  console.log('[3CX Audio Extension] Botão de gravação injetado com sucesso');
+  
+  // Ajusta novamente o layout após inserção
+  setTimeout(ajustarLayoutChat, 50);
+  setTimeout(ajustarLayoutChat, 500);
+  
+  // Aplica correção de emergências para garantir que o botão não seja cortado
+  setTimeout(correcaoEmergenciaLayout, 100);
+  setTimeout(correcaoEmergenciaLayout, 1000);
+}
+
+// Função para aplicar estilos ao botão de gravação
+function applyRecordButtonStyles(button) {
+  button.style.width = '26px';
+  button.style.height = '26px';
+  button.style.minWidth = '26px';
+  button.style.minHeight = '26px';
+  button.style.padding = '2px';
+  button.style.margin = '0 2px';
+  button.style.flexShrink = '0';
+  button.style.flexGrow = '0';
+  button.style.display = 'inline-flex';
+  button.style.alignItems = 'center';
+  button.style.justifyContent = 'center';
+  button.style.background = 'transparent';
+  button.style.border = 'none';
+  button.style.fontSize = '0';
+  button.style.position = 'relative';
+  button.style.zIndex = '10';
+  button.style.visibility = 'visible';
+  button.style.opacity = '1';
+  
+  // Reduz o tamanho do SVG dentro do botão
+  const svgContainer = button.querySelector('.record-svg');
+  if (svgContainer) {
+    svgContainer.style.width = '18px';
+    svgContainer.style.height = '18px';
+    svgContainer.style.display = 'inline-flex';
+    svgContainer.style.alignItems = 'center';
+    svgContainer.style.justifyContent = 'center';
+  }
+}
+
+// Função para adicionar o evento de click ao botão de gravação
+function addRecordButtonClickEvent(button) {
+  button.addEventListener('click', async function() {
     console.log('[3CX Audio Extension] Botão de gravação clicado');
     
-    // Desabilita temporariamente para evitar cliques múltiplos
-    recordButton.disabled = true;
+    // Desabilita temporariamente o botão para evitar cliques múltiplos
+    button.disabled = true;
     
     try {
       if (isRecording) {
         // Se estiver gravando, para a gravação
         console.log('[3CX Audio Extension] Parando gravação...');
-        recordButton.title = 'Parando gravação...';
+        button.title = 'Parando gravação...';
         await stopRecording();
       } else {
         // Inicia nova gravação
         console.log('[3CX Audio Extension] Iniciando gravação...');
-        recordButton.title = 'Iniciando gravação...';
+        button.title = 'Iniciando gravação...';
         const result = await startRecording();
         
         if (!result.success) {
@@ -240,34 +316,29 @@ function injectRecordButton() {
       alert('Ocorreu um erro ao processar o áudio. Por favor, tente novamente.');
     } finally {
       // Sempre reabilita o botão ao final
-      recordButton.disabled = false;
+      button.disabled = false;
     }
   });
-
-  // Tenta encontrar o botão do paperclip por diversos seletores
-  const paperclipButton = chatContainer.querySelector('button[app-paperclip-light-icon], button[title*="Anexar"], button[aria-label*="Anexar"]');
-  
-  // Mover os botões para o grupo de ações
-  if (paperclipButton) {
-    actionButtonsGroup.appendChild(paperclipButton);
-  }
-  
-  // Adicionar botão de gravação ao grupo
-  actionButtonsGroup.appendChild(recordButton);
-  
-  // Verificar se há botão de emoji e movê-lo também
-  const emojiButton = chatContainer.querySelector('button[title*="emoji" i], button[title*="Emoji"]');
-  if (emojiButton) {
-    actionButtonsGroup.appendChild(emojiButton);
-  }
-  
-  console.log('[3CX Audio Extension] Botão de gravação injetado com sucesso');
 }
 
 // Função para garantir que o botão de gravação está presente
 function ensureRecordButton() {
+  console.log('[3CX Audio Extension] Verificando botão de gravação...');
+  
+  // Verifica se existe o botão de template
+  const templateButton = document.querySelector('#templateSelector');
+  if (!templateButton) {
+    // Tenta localizar um seletor alternativo para o botão de template
+    const alternativeTemplateButton = document.querySelector('.templates-button, button[title*="template"], button[aria-label*="template"]');
+    if (!alternativeTemplateButton) {
+      console.log('[3CX Audio Extension] Botão de template não encontrado, tentando novamente mais tarde...');
+      return false;
+    }
+  }
+  
   // Verifica se o botão já existe
   if (document.querySelector('#audioRecordButton')) {
+    // O botão já existe
     return true;
   }
   
@@ -326,22 +397,40 @@ let gravacaoTimerSpan = null;
 // Funções para ocultar/restaurar botões da barra de chat
 let chatHiddenButtons = [];
 function ocultarBotoesChat() {
-  // Nenhuma modificação nos outros botões
-  // Apenas marca o botão de gravação como ativo
+  // Não altera mais o layout do botão de gravação!
+  // Apenas deixa o ícone vermelho via classe .recording (já implementado no CSS)
   const recordButton = document.querySelector('#audioRecordButton');
-  if (recordButton) {
-    recordButton.classList.add('recording');
-  }
+  if (!recordButton) return;
+  // Nenhuma alteração de estilo inline!
 }
 
 function restaurarBotoesChat() {
+  if (chatBarOriginalWidth) {
+    const bar = document.querySelector('#audioRecordButton')?.parentNode;
+    if (bar) bar.style.minWidth = '';
+  }
+  chatHiddenButtons.forEach(btn => { btn.style.display = ''; });
+  chatHiddenButtons = [];
   const recordButton = document.querySelector('#audioRecordButton');
   if (recordButton) {
-    // Remove a classe de gravação ativa
+    recordButton.style.flex = '';
+    recordButton.style.justifyContent = '';
+    recordButton.style.maxWidth = '';
+    recordButton.style.background = '';
+    recordButton.style.boxShadow = '';
+    recordButton.style.borderRadius = '';
+    recordButton.style.height = '';
+    recordButton.style.fontSize = '';
+    recordButton.style.display = '';
+    recordButton.style.alignItems = '';
+    recordButton.style.position = '';
+    // Corrigir estado visual do botão
     recordButton.classList.remove('recording');
     recordButton.title = 'Gravar áudio';
+    // Restaurar conteúdo original
     recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
   }
+  chatBarOriginalWidth = null;
 }
 
 // Ajustar iniciar/parar timer para ocultar/restaurar botões
@@ -854,7 +943,7 @@ async function stopRecording(cancelar = false) {
         };
         
         // Para a gravação
-      mediaRecorder.stop();
+        mediaRecorder.stop();
       });
     } else {
       // Se já estava parado por alguma razão
@@ -864,7 +953,7 @@ async function stopRecording(cancelar = false) {
       // Limpa recursos
       if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
-      audioStream = null;
+        audioStream = null;
       }
       
       // Restaura o botão
@@ -873,7 +962,7 @@ async function stopRecording(cancelar = false) {
         mainRecordButton.title = 'Gravar áudio';
       }
       
-    return { success: true };
+      return { success: true };
     }
   } catch (error) {
     console.error('[3CX Audio Extension] Erro ao parar gravação:', error);
@@ -884,11 +973,11 @@ async function stopRecording(cancelar = false) {
     
     if (audioStream) {
       try {
-      audioStream.getTracks().forEach(track => track.stop());
+        audioStream.getTracks().forEach(track => track.stop());
       } catch (e) {
         console.error('[3CX Audio Extension] Erro ao liberar faixas de áudio:', e);
-    }
-    audioStream = null;
+      }
+      audioStream = null;
     }
     
     // Restaura o botão
@@ -1067,7 +1156,7 @@ function substituirFileMessagePorPlayer() {
       nomeUsuario = nomeUsuarioReal;
     }
 
-    // Player customizado moderno (igual à pré-visualização)
+    // Cria o player customizado
     const previewContainer = document.createElement('div');
     previewContainer.className = 'custom-audio-player';
     previewContainer.style.display = 'flex';
@@ -1213,6 +1302,40 @@ function substituirFileMessagePorPlayer() {
 
     previewContainer.appendChild(playerBox);
 
+    // Ajustar botões de ação
+    const actionsBox = document.createElement('div');
+    actionsBox.style.display = 'flex';
+    actionsBox.style.alignItems = 'center';
+    actionsBox.style.gap = '6px';
+    actionsBox.style.marginLeft = '18px';
+
+    // Botão Enviar
+    sendAudioButton = document.createElement('button');
+    sendAudioButton.innerHTML = '<span title="Enviar"><svg width="24" height="24" fill="#2196F3" viewBox="0 0 24 24"><path d="M2 21l21-9-21-9v7l15 2-15 2z"/></svg></span>';
+    sendAudioButton.className = 'btn btn-plain';
+    sendAudioButton.title = 'Enviar';
+    sendAudioButton.onclick = () => {
+      anexarAudioNaConversa(audioFile);
+      removerJanelaFlutuante();
+      restaurarBotoesChat();
+      // Resetar variáveis de gravação para permitir nova gravação
+      mediaRecorder = null;
+      audioStream = null;
+      audioChunks = [];
+      audioBlob = null;
+      audioFile = null;
+      isRecording = false;
+      isPaused = false;
+      tempoPausado = 0;
+      pausaTimestamp = null;
+    };
+
+    // Botão Cancelar
+    closeAudioPreviewButton = document.createElement('button');
+    closeAudioPreviewButton.innerHTML = '<span title="Cancelar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12l-4.89 4.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg></span>';
+    closeAudioPreviewButton.className = 'btn btn-plain';
+    closeAudioPreviewButton.title = 'Cancelar';
+    closeAudioPreviewButton.onclick = () => {
     // Substitui o conteúdo do file-message pelo player customizado
     fm.innerHTML = '';
     fm.appendChild(previewContainer);
@@ -1244,7 +1367,7 @@ if (document.readyState === 'loading') {
 (function garantirFlexBarraChat() {
   const style = document.createElement('style');
   style.textContent = `
-    #chat-form-controls, .ChatInput-ActionsContainer {
+    #chat-form-controls {
       display: flex !important;
       flex-direction: row !important;
       align-items: center !important;
@@ -1254,9 +1377,6 @@ if (document.readyState === 'loading') {
       padding: 8px 12px !important;
       background: #fff !important;
       border-top: 1px solid rgba(0,0,0,0.1) !important;
-      width: calc(100% - 10px) !important;
-      overflow-x: hidden !important;
-      box-sizing: border-box !important;
     }
     #chat-form-controls > * {
       vertical-align: middle !important;
@@ -1277,9 +1397,6 @@ if (document.readyState === 'loading') {
       cursor: pointer !important;
       flex-shrink: 0 !important;
       position: relative !important;
-      z-index: 50 !important;
-      visibility: visible !important;
-      opacity: 1 !important;
     }
     #audioRecordButton:hover {
       background-color: rgba(0, 0, 0, 0.05) !important;
@@ -1456,7 +1573,7 @@ async function tentarAcessarMicrofone() {
       if (stream && stream.getAudioTracks().length > 0) {
         console.log('[3CX Audio Extension] Acesso ao microfone bem-sucedido!');
         // Importante: libera o stream após o teste para não manter o microfone ocupado
-    stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(track => track.stop());
         return { success: true };
       } else {
         console.log('[3CX Audio Extension] Stream obtido, mas sem faixas de áudio');
@@ -1485,7 +1602,7 @@ async function solicitarPermissaoAudio() {
     
     if (resultado.success) {
       console.log('[3CX Audio Extension] Permissão de áudio concedida!');
-    return true;
+      return true;
     } else {
       if (resultado.error) {
         console.error('[3CX Audio Extension] Erro ao solicitar permissão de áudio:', resultado.error);
@@ -1812,911 +1929,306 @@ if (document.readyState === 'loading') {
 } else {
   setupObserver();
   iniciarMonitorLayout();
-} 
+}
 
 // Função para ajustar o layout do chat para acomodar o botão de áudio
 function ajustarLayoutChat() {
+  console.log('[3CX Audio Extension] Ajustando layout do chat...');
+  
   // Tenta encontrar o container de chat
   const chatControls = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
-  if (!chatControls) return;
-  
-  // Injetar botão se ainda não existir
-  if (!document.querySelector('#audioRecordButton')) {
-    injectRecordButton();
-  }
-  
-  // Aplicar estilos robustos ao container
-  chatControls.style.cssText = `
-    display: flex !important;
-    align-items: center !important;
-    flex-direction: row !important;
-    gap: 4px !important;
-    padding: 8px 12px !important;
-    overflow: visible !important;
-    width: 100% !important;
-    flex-wrap: nowrap !important;
-    box-sizing: border-box !important;
-    justify-content: flex-end !important;
-  `;
-
-  // Encontra o campo de texto e garante que ele tenha flexibilidade
-  const textInput = chatControls.querySelector('textarea, .ChatInput-TextArea, [contenteditable="true"]');
-  if (textInput) {
-    textInput.style.cssText = `
-      flex: 1 1 auto !important;
-      min-width: 0 !important;
-      margin-right: 8px !important;
-    `;
-  }
-  
-  // Verificar todos os botões e garantir que estão visíveis e compactos
-  const buttons = chatControls.querySelectorAll('button');
-  buttons.forEach(button => {
-    if (button.id === 'audioRecordButton' || 
-        button.title?.includes('Emoji') || 
-        button.title?.includes('emoji') ||
-        button.title?.includes('Anexar') ||
-        button.title?.includes('anexar') ||
-        button.title?.includes('Attach')) {
-      
-      button.style.cssText = `
-        display: inline-flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        margin: 0 1px !important;
-        padding: 4px !important;
-        width: 28px !important;
-        height: 28px !important;
-        min-width: 28px !important;
-        min-height: 28px !important;
-        flex: 0 0 auto !important;
-        box-sizing: content-box !important;
-        align-items: center !important;
-        justify-content: center !important;
-      `;
-    }
-  });
-}
-
-// Função para forçar ajustes de layout em caso de problemas críticos
-function correcaoEmergenciaLayout() {
-  const chatControls = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
-  if (!chatControls) return;
-
-  // Primeira tentativa: estilos CSS diretos
-  const styleElement = document.createElement('style');
-  styleElement.textContent = `
-    #chat-form-controls, .ChatInput-ActionsContainer {
-      display: flex !important;
-      align-items: center !important;
-      flex-direction: row !important;
-      gap: 4px !important;
-      padding: 8px 12px !important;
-      flex-wrap: nowrap !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
-    }
-    
-    #chat-form-controls textarea, 
-    .ChatInput-ActionsContainer textarea,
-    #chat-form-controls [contenteditable="true"], 
-    .ChatInput-ActionsContainer [contenteditable="true"] {
-      flex: 1 1 auto !important;
-      min-width: 0 !important;
-      margin-right: 8px !important;
-    }
-    
-    #chat-form-controls > button, 
-    .ChatInput-ActionsContainer > button {
-      display: inline-flex !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      margin: 0 1px !important;
-      padding: 4px !important;
-      width: 28px !important;
-      height: 28px !important;
-      min-width: 28px !important;
-      min-height: 28px !important;
-      flex: 0 0 auto !important;
-      box-sizing: content-box !important;
-    }
-    
-    #audioRecordButton {
-      display: inline-flex !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      margin: 0 1px !important;
-      padding: 4px !important;
-      width: 28px !important;
-      height: 28px !important;
-      min-width: 28px !important;
-      min-height: 28px !important;
-      flex: 0 0 auto !important;
-      box-sizing: content-box !important;
-    }
-  `;
-  
-  // Remove estilo anterior se existir
-  const oldStyle = document.getElementById('3cx-emergency-style');
-  if (oldStyle) oldStyle.remove();
-  
-  // Adiciona o novo estilo
-  styleElement.id = '3cx-emergency-style';
-  document.head.appendChild(styleElement);
-  
-  // Segunda tentativa: manipulação DOM direta
-  // Garante que o botão de áudio está no lugar certo
-  const audioButton = document.querySelector('#audioRecordButton');
-  const emojiButton = chatControls.querySelector('button[title*="emoji" i], button[title*="Emoji"]');
-  
-  if (audioButton && emojiButton && emojiButton.parentNode) {
-    // Insere o botão de áudio após o botão de emoji
-    if (audioButton.parentNode !== emojiButton.parentNode) {
-      emojiButton.parentNode.insertBefore(audioButton, emojiButton.nextSibling);
-    }
-    
-    // Garante que ambos são visíveis e compactos
-    audioButton.style.cssText = `
-      display: inline-flex !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      margin: 0 1px !important;
-      padding: 4px !important;
-      width: 28px !important;
-      height: 28px !important;
-      min-width: 28px !important;
-      min-height: 28px !important;
-      flex: 0 0 auto !important;
-      box-sizing: content-box !important;
-      align-items: center !important;
-      justify-content: center !important;
-    `;
-    
-    emojiButton.style.cssText = `
-      display: inline-flex !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      margin: 0 1px !important;
-      padding: 4px !important;
-      width: 28px !important;
-      height: 28px !important;
-      min-width: 28px !important;
-      min-height: 28px !important;
-      flex: 0 0 auto !important;
-      box-sizing: content-box !important;
-      align-items: center !important;
-      justify-content: center !important;
-    `;
-  }
-}
-
-// Garantir a inicialização do monitor de layout mais frequentemente
-function iniciarMonitorLayout() {
-  // Aplica imediatamente
-  ajustarLayoutChat();
-  correcaoEmergenciaLayout();
-  
-  // Continua aplicando em intervalos mais frequentes
-  setInterval(() => {
-    ajustarLayoutChat();
-    correcaoEmergenciaLayout();
-  }, 1000); // Reduzido de 1500 para 1000ms
-  
-  // Adiciona monitor de resize da janela
-  window.addEventListener('resize', () => {
-    ajustarLayoutChat();
-    correcaoEmergenciaLayout();
-  });
-}
-
-// Função para injetar o botão mais agressivamente
-function forcarInjecaoRecordButton() {
-  console.log('[3CX Audio Extension] Forçando injeção do botão de gravação...');
-  
-  // Se já existir, não faz nada
-  if (document.querySelector('#audioRecordButton')) {
+  if (!chatControls) {
+    console.log('[3CX Audio Extension] Container de chat não encontrado');
     return;
   }
   
-  // Tenta localizar qualquer container de chat para injetar o botão
-  const chatControls = document.querySelector('#chat-form-controls, .ChatInput-ActionsContainer');
-  if (!chatControls) return;
+  // Obter o contêiner pai para determinar a largura disponível
+  const parentContainer = chatControls.parentElement;
+  if (parentContainer) {
+    // Certifique-se de que o pai tenha overflow controlado
+    parentContainer.style.overflowX = 'hidden';
+    parentContainer.style.maxWidth = '100%';
+  }
   
-  // Tenta encontrar um elemento de referência
-  const templateButton = chatControls.querySelector('button') || 
-                         chatControls.querySelector('input') ||
-                         chatControls.firstElementChild;
+  // Verifica se o botão de áudio já existe
+  const audioButton = document.querySelector('#audioRecordButton');
+  const needsToInject = !audioButton;
   
-  if (!templateButton) return;
+  // IMPORTANTE: Primeiro ajusta o container principal para garantir espaço
+  chatControls.style.display = 'flex';
+  chatControls.style.alignItems = 'center';
+  chatControls.style.flexWrap = 'nowrap';
+  chatControls.style.gap = '2px'; // Reduzimos para economizar espaço
+  chatControls.style.padding = '0 4px 0 6px'; // Mais espaço na esquerda, menos na direita
+  chatControls.style.position = 'relative';
+  chatControls.style.overflow = 'hidden';
+  chatControls.style.width = 'calc(100% - 20px)'; // Reduzir ainda mais para evitar overflow
+  chatControls.style.maxWidth = 'calc(100% - 20px)';
+  chatControls.style.boxSizing = 'border-box';
+  chatControls.style.minHeight = '44px';
   
-  // Cria o botão de gravação
-  const recordButton = document.createElement('button');
-  recordButton.type = 'button';
-  recordButton.id = 'audioRecordButton';
-  recordButton.className = templateButton.className || '';
-  recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
-  recordButton.title = 'Gravar áudio';
+  // Se precisar injetar o botão, faz isso agora
+  if (needsToInject) {
+    console.log('[3CX Audio Extension] Botão de gravação não encontrado, tentando injetá-lo...');
+    injectRecordButton();
+    // Retorna aqui para permitir que a função seja chamada novamente após a injeção
+    return;
+  }
   
-  // Estilos inline para garantir visibilidade
-  recordButton.style.cssText = `
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 28px !important;
-    height: 28px !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 50 !important;
-    position: relative !important;
-    padding: 2px !important;
-    margin: 0 4px !important;
-    background: transparent !important;
-    border: none !important;
-  `;
+  // Garante que a área de texto não ocupe muito espaço
+  const textArea = chatControls.querySelector('textarea');
+  if (textArea) {
+    textArea.style.flex = '1';
+    textArea.style.minWidth = '60px';
+    textArea.style.maxWidth = 'calc(100% - 180px)'; // Mais espaço para os botões
+    textArea.style.width = 'auto';
+    textArea.style.margin = '0';
+  }
   
-  // Evento de clique
-  recordButton.addEventListener('click', async function() {
-    try {
-      if (isRecording) {
-        await stopRecording();
-      } else {
-        const result = await startRecording();
-        if (!result.success) {
-          alert(`Erro: ${result.error}`);
-        }
+  // Ajuste o container de texto (pai da textarea) se existir
+  const textContainer = textArea?.parentElement;
+  if (textContainer && textContainer !== chatControls) {
+    textContainer.style.flex = '1';
+    textContainer.style.minWidth = '60px';
+    textContainer.style.maxWidth = 'calc(100% - 180px)'; // Mais espaço para os botões
+    textContainer.style.width = 'auto';
+    textContainer.style.margin = '0';
+  }
+  
+  // Restaura quaisquer botões que possam estar ocultos em containers especiais
+  const oldContainers = document.querySelectorAll('.audio-extension-right-buttons');
+  oldContainers.forEach(container => {
+    // Move qualquer botão de volta para sua posição original
+    Array.from(container.children).forEach(child => {
+      if (child.tagName === 'BUTTON') {
+        chatControls.appendChild(child);
       }
-    } catch (e) {
-      console.error('[3CX Audio Extension] Erro ao manipular gravação:', e);
+    });
+    container.remove();
+  });
+  
+  // Ajusta o tamanho e a visibilidade de cada botão sem remover nenhum
+  const allButtons = chatControls.querySelectorAll('button');
+  allButtons.forEach(button => {
+    // Garante que nenhum botão esteja oculto
+    if (button.style.display === 'none') {
+      button.style.display = '';
+    }
+    if (button.style.visibility === 'hidden') {
+      button.style.visibility = '';
+    }
+    
+    // Tamanho menor para todos os botões para economizar espaço
+    button.style.width = '26px';
+    button.style.height = '26px';
+    button.style.minWidth = '26px';
+    button.style.minHeight = '26px';
+    button.style.padding = '2px';
+    button.style.margin = '0 1px';
+    button.style.flexShrink = '0';
+    button.style.boxSizing = 'border-box';
+    
+    // Verifica se é um botão específico
+    const isSendButton = button.type === 'submit' || button.title?.includes('Enviar');
+    const isEmojiButton = button.title?.toLowerCase().includes('emoji') || button.querySelector('[title*="emoji" i]');
+    const isAttachButton = button.title?.toLowerCase().includes('anexar') || button.title?.toLowerCase().includes('attach') || button.querySelector('[title*="attach" i]') || button.querySelector('[title*="arquivo" i]');
+    
+    // Tratamento especial para o botão de emoji
+    if (isEmojiButton) {
+      button.style.display = 'inline-flex';
+      button.style.visibility = 'visible';
+      button.style.opacity = '1';
+    }
+    
+    // Tratamento especial para o botão de anexar
+    if (isAttachButton) {
+      button.style.display = 'inline-flex';
+      button.style.visibility = 'visible';
+      button.style.opacity = '1';
+    }
+    
+    // Posiciona o botão de enviar à direita
+    if (isSendButton) {
+      button.style.marginLeft = 'auto';
     }
   });
   
-  // Insere após o primeiro elemento
-  chatControls.insertBefore(recordButton, templateButton.nextSibling);
-  console.log('[3CX Audio Extension] Botão injetado forçadamente');
+  // Ajusta botão de áudio especificamente e garante que esteja visível
+  if (audioButton) {
+    audioButton.style.width = '26px';
+    audioButton.style.height = '26px';
+    audioButton.style.minWidth = '26px';
+    audioButton.style.minHeight = '26px';
+    audioButton.style.padding = '2px';
+    audioButton.style.margin = '0 2px';
+    audioButton.style.display = 'inline-flex';
+    audioButton.style.alignItems = 'center';
+    audioButton.style.justifyContent = 'center';
+    audioButton.style.background = 'transparent';
+    audioButton.style.border = 'none';
+    audioButton.style.visibility = 'visible';
+    audioButton.style.opacity = '1';
+    audioButton.style.position = 'relative';
+    audioButton.style.flexShrink = '0';
+    audioButton.style.flexGrow = '0';
+    
+    // Ajusta o SVG dentro do botão
+    const svgContainer = audioButton.querySelector('.record-svg');
+    if (svgContainer) {
+      svgContainer.style.width = '18px';
+      svgContainer.style.height = '18px';
+      svgContainer.style.display = 'inline-flex';
+      svgContainer.style.alignItems = 'center';
+      svgContainer.style.justifyContent = 'center';
+    }
+    
+    // Traz o botão para frente (aumenta a chance de ele ficar visível)
+    audioButton.style.zIndex = '10';
+  }
+
+  // Verifica se após os ajustes o botão ainda existe e está visível
+  setTimeout(() => {
+    const buttonAfterAdjust = document.querySelector('#audioRecordButton');
+    if (!buttonAfterAdjust) {
+      console.log('[3CX Audio Extension] Botão desapareceu após ajustes, reinserindo...');
+      injectRecordButton();
+    } else if (window.getComputedStyle(buttonAfterAdjust).display === 'none' || 
+              window.getComputedStyle(buttonAfterAdjust).visibility === 'hidden') {
+      console.log('[3CX Audio Extension] Botão está invisível após ajustes, corrigindo...');
+      buttonAfterAdjust.style.display = 'inline-flex';
+      buttonAfterAdjust.style.visibility = 'visible';
+      buttonAfterAdjust.style.opacity = '1';
+    }
+  }, 100);
+
+  console.log('[3CX Audio Extension] Layout ajustado preservando todos os botões');
 }
 
-// Adicionar chamada para forçar injeção após alguns segundos
-setTimeout(forcarInjecaoRecordButton, 3000);
-setTimeout(forcarInjecaoRecordButton, 6000);
-setTimeout(forcarInjecaoRecordButton, 9000);
-
-// Adicionar CSS global para garantir o layout correto
-(function adicionarCSS() {
-  const styleElement = document.createElement('style');
-  styleElement.id = '3cx-audio-button-style';
-  styleElement.textContent = `
-    /* Garantir que o container tenha layout flexível */
-    #chat-form-controls, .ChatInput-ActionsContainer {
-      display: flex !important;
-      align-items: center !important;
-      flex-direction: row !important;
-      gap: 4px !important;
-      padding: 8px 12px !important;
-      flex-wrap: nowrap !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
+// Função para corrigir emergências de layout
+function correcaoEmergenciaLayout() {
+  const audioButton = document.querySelector('#audioRecordButton');
+  if (!audioButton) {
+    console.log('[3CX Audio Extension] Botão de gravação não encontrado, tentando injetar...');
+    injectRecordButton();
+    return;
+  }
+  
+  // ABORDAGEM AGRESSIVA: Certifica-se de que o botão de áudio esteja visível
+  audioButton.style.display = 'inline-flex';
+  audioButton.style.visibility = 'visible';
+  audioButton.style.opacity = '1';
+  audioButton.style.zIndex = '10'; // Coloca o botão na frente para garantir visibilidade
+  
+  // Garante que o botão de áudio tenha o tamanho correto
+  audioButton.style.width = '26px';
+  audioButton.style.height = '26px';
+  audioButton.style.minWidth = '26px';
+  audioButton.style.minHeight = '26px';
+  audioButton.style.padding = '2px';
+  audioButton.style.margin = '0 2px';
+  
+  // Ajusta o SVG se existir
+  const svgContainer = audioButton.querySelector('.record-svg');
+  if (svgContainer) {
+    svgContainer.style.width = '18px';
+    svgContainer.style.height = '18px';
+    svgContainer.style.display = 'inline-flex';
+  }
+  
+  // Garantir espaço para os botões do lado direito sem manipulá-los diretamente
+  const chatControls = audioButton.closest('#chat-form-controls, .ChatInput-ActionsContainer');
+  if (chatControls) {
+    // Ajusta o container para não ultrapassar a área visível
+    chatControls.style.width = 'calc(100% - 20px)';
+    chatControls.style.maxWidth = 'calc(100% - 20px)';
+    chatControls.style.overflowX = 'hidden';
+    chatControls.style.display = 'flex';
+    chatControls.style.flexWrap = 'nowrap';
+    chatControls.style.gap = '2px';
+    chatControls.style.alignItems = 'center';
+    chatControls.style.boxSizing = 'border-box';
+    
+    // Garante que o pai também tenha overflow controlado
+    const parentContainer = chatControls.parentElement;
+    if (parentContainer) {
+      parentContainer.style.overflowX = 'hidden';
+      parentContainer.style.maxWidth = '100%';
     }
     
-    /* Campo de entrada com flex adequado */
-    #chat-form-controls textarea, 
-    .ChatInput-ActionsContainer textarea,
-    #chat-form-controls [contenteditable="true"], 
-    .ChatInput-ActionsContainer [contenteditable="true"],
-    #chat-form-controls div[role="textbox"], 
-    .ChatInput-ActionsContainer div[role="textbox"] {
-      flex: 1 1 auto !important;
-      min-width: 0 !important;
-      margin-right: 8px !important;
-    }
-    
-    /* Garantir que os botões apareçam compactos */
-    #audioRecordButton {
-      display: inline-flex !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      margin: 0 1px !important;
-      padding: 4px !important;
-      width: 28px !important;
-      height: 28px !important;
-      min-width: 28px !important;
-      min-height: 28px !important;
-      flex: 0 0 auto !important;
-      box-sizing: content-box !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-    
-    /* Botões padrão alinhados */
-    #chat-form-controls > button,
-    .ChatInput-ActionsContainer > button {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      margin: 0 1px !important;
-      padding: 4px !important;
-      width: 28px !important;
-      height: 28px !important;
-      min-width: 28px !important;
-      min-height: 28px !important;
-      flex: 0 0 auto !important;
-      box-sizing: content-box !important;
-    }
-    
-    /* Tamanho de ícone adequado */
-    #audioRecordButton svg {
-      width: 18px !important;
-      height: 18px !important;
-      flex: none !important;
-    }
-    
-    /* Contêiner para grupo de botões para garantir que fiquem juntos */
-    .action-buttons-group {
-      display: inline-flex !important;
-      align-items: center !important;
-      gap: 1px !important;
-      flex-shrink: 0 !important;
-    }
-    
-    @media (max-width: 480px) {
-      #chat-form-controls, .ChatInput-ActionsContainer {
-        padding: 4px 8px !important;
+    // Certifica-se de que nenhum botão esteja com display: none
+    const allButtons = chatControls.querySelectorAll('button');
+    allButtons.forEach(button => {
+      if (button.style.display === 'none') {
+        button.style.display = 'inline-flex';
       }
+      if (button.style.visibility === 'hidden') {
+        button.style.visibility = 'visible';
+      }
+      button.style.flexShrink = '0';
+      button.style.zIndex = '5'; // Aumenta o z-index de todos os botões
       
-      #chat-form-controls > button,
-      .ChatInput-ActionsContainer > button,
-      #audioRecordButton {
-        width: 26px !important;
-        height: 26px !important;
-        min-width: 26px !important;
-        min-height: 26px !important;
-        padding: 3px !important;
-      }
-    }
-  `;
-  
-  // Remove o estilo antigo se existir
-  const oldStyle = document.getElementById('3cx-audio-button-style');
-  if (oldStyle) oldStyle.remove();
-  
-  // Adiciona o novo estilo
-  document.head.appendChild(styleElement);
-})();
-
-// Adiciona CSS global simples apenas para o botão de gravação
-function addAudioButtonStyles() {
-  if (document.getElementById('3cx-audio-button-styles')) return;
-  
-  const style = document.createElement('style');
-  style.id = '3cx-audio-button-styles';
-  style.textContent = `
-    #audioRecordButton {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      cursor: pointer !important;
-      padding: 5px !important;
+      // Reduz o tamanho de todos os botões
+      button.style.width = '26px';
+      button.style.height = '26px';
+      button.style.minWidth = '26px';
+      button.style.minHeight = '26px';
+      button.style.padding = '2px';
+      button.style.margin = '0 1px';
+      button.style.boxSizing = 'border-box';
+    });
+    
+    // Garante que a textarea não ocupe demais espaço
+    const textarea = chatControls.querySelector('textarea');
+    if (textarea) {
+      textarea.style.maxWidth = 'calc(100% - 180px)';
     }
     
-    #audioRecordButton .record-svg {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
+    // Verifica containers pais para garantir que não tenham overflow cortando elementos
+    let parent = chatControls.parentElement;
+    while (parent && parent !== document.body) {
+      parent.style.overflowX = 'visible';  // Impede que os pais cortem o conteúdo horizontalmente
+      parent = parent.parentElement;
     }
-    
-    #audioRecordButton.recording .record-svg svg {
-      color: #f44336 !important;
-      animation: pulse 1s infinite !important;
-    }
-    
-    #audioRecordButton svg {
-      width: 20px !important;
-      height: 20px !important;
-      fill: currentColor !important;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
-    }
-  `;
+  }
   
-  document.head.appendChild(style);
-  console.log('[3CX Audio Extension] Estilos básicos do botão adicionados');
-}
-
-// Garantir que os estilos sejam adicionados
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', addAudioButtonStyles);
-} else {
-  addAudioButtonStyles();
+  // Verifica se os botões de emoji e anexar estão presentes e visíveis
+  const emojiButton = document.querySelector('button[title*="emoji" i], button[aria-label*="emoji" i]');
+  const attachButton = document.querySelector('button[title*="anexar" i], button[title*="attach" i], button[aria-label*="file" i]');
+  
+  if (emojiButton) {
+    emojiButton.style.display = 'inline-flex';
+    emojiButton.style.visibility = 'visible';
+    emojiButton.style.opacity = '1';
+  }
+  
+  if (attachButton) {
+    attachButton.style.display = 'inline-flex';
+    attachButton.style.visibility = 'visible';
+    attachButton.style.opacity = '1';
+  }
+  
+  console.log('[3CX Audio Extension] Correção de emergência de layout aplicada');
+  
+  // Agenda uma verificação adicional para garantir que o botão permaneça visível
+  setTimeout(() => {
+    const buttonCheck = document.querySelector('#audioRecordButton');
+    if (!buttonCheck) {
+      injectRecordButton();
+    } else if (window.getComputedStyle(buttonCheck).display === 'none' || 
+               window.getComputedStyle(buttonCheck).visibility === 'hidden') {
+      buttonCheck.style.display = 'inline-flex';
+      buttonCheck.style.visibility = 'visible';
+      buttonCheck.style.opacity = '1';
+    }
+  }, 250);
 }
 
 // ... existing code ...
 
-// Função para criar a janela flutuante
-function criarJanelaFlutuante() {
-  if (floatingAudioContainer) return;
-
-  floatingAudioContainer = document.createElement('div');
-  floatingAudioContainer.id = 'floatingAudioContainer';
-  floatingAudioContainer.style.cssText = `
-    position: fixed;
-    bottom: 70px;
-    right: 20px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 10000;
-    width: 280px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
-  `;
-  
-  document.body.appendChild(floatingAudioContainer);
-  
-  console.log('[3CX Audio Extension] Janela flutuante criada');
-}
-
-// Função para remover a janela flutuante
-function removerJanelaFlutuante() {
-  if (floatingAudioContainer) {
-    floatingAudioContainer.remove();
-    floatingAudioContainer = null;
-  }
-  audioBlob = null;
-  audioFile = null;
-  floatingState = null;
-}
-
-// Função para atualizar a janela flutuante conforme o estado
-function atualizarJanelaFlutuante(state, blob = null, file = null) {
-  console.log(`[3CX Audio Extension] Atualizando janela flutuante para: ${state}`);
-  
-  if (!floatingAudioContainer) {
-    criarJanelaFlutuante();
-  }
-  
-  floatingState = state;
-  floatingAudioContainer.innerHTML = '';
-  
-  // Header com controles
-  const header = document.createElement('div');
-  header.style.cssText = `
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    margin-bottom: 10px;
-  `;
-  
-  // Título da janela
-  const title = document.createElement('div');
-  title.style.cssText = `
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-  `;
-  title.textContent = state === 'recording' ? 'Gravando áudio...' : 'Prévia do áudio';
-  
-  // Botão fechar
-  const closeButton = document.createElement('button');
-  closeButton.type = 'button';
-  closeButton.style.cssText = `
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    color: #999;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-  closeButton.innerHTML = '&times;';
-  closeButton.title = 'Fechar';
-  closeButton.onclick = () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-    }
-    removerJanelaFlutuante();
-    restaurarBotoesChat();
-    isRecording = false;
-  };
-  
-  header.appendChild(title);
-  header.appendChild(closeButton);
-  floatingAudioContainer.appendChild(header);
-  
-  // Conteúdo específico para cada estado
-  if (state === 'recording') {
-    // Container para o timer
-    const timerContainer = document.createElement('div');
-    timerContainer.style.cssText = `
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 10px 0;
-      width: 100%;
-    `;
-    
-    // Círculo do timer (visual)
-    const timerCircle = document.createElement('div');
-    timerCircle.style.cssText = `
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background-color: #f44336;
-      margin-right: 8px;
-      animation: pulse 1s infinite;
-    `;
-    
-    // Span para o tempo
-    gravacaoTimerSpan = document.createElement('span');
-    gravacaoTimerSpan.id = 'gravacao-timer';
-    gravacaoTimerSpan.style.cssText = `
-      font-size: 16px;
-      font-weight: 500;
-      color: #333;
-    `;
-    gravacaoTimerSpan.textContent = '00:00';
-    
-    timerContainer.appendChild(timerCircle);
-    timerContainer.appendChild(gravacaoTimerSpan);
-    floatingAudioContainer.appendChild(timerContainer);
-    
-    // Container para botões
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin-top: 10px;
-    `;
-    
-    // Botão pausar/continuar
-    pauseResumeButton = document.createElement('button');
-    pauseResumeButton.type = 'button';
-    pauseResumeButton.style.cssText = `
-      background-color: #f0f0f0;
-      border: none;
-      border-radius: 4px;
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-      margin-right: 8px;
-    `;
-    pauseResumeButton.innerHTML = SVG_PAUSE_CONTENT;
-    pauseResumeButton.title = 'Pausar gravação';
-    pauseResumeButton.onclick = togglePauseGravacao;
-    
-    // Botão parar
-    stopButton = document.createElement('button');
-    stopButton.type = 'button';
-    stopButton.style.cssText = `
-      background-color: #f44336;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-    `;
-    stopButton.innerHTML = `<span title="Parar"><svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg></span>`;
-    stopButton.title = 'Parar gravação';
-    stopButton.onclick = () => {
-      if (mediaRecorder && (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused')) {
-        mediaRecorder.stop();
-      }
-    };
-    
-    buttonsContainer.appendChild(pauseResumeButton);
-    buttonsContainer.appendChild(stopButton);
-    floatingAudioContainer.appendChild(buttonsContainer);
-    
-  } else if (state === 'preview' && blob) {
-    // Container do player
-    const audioPlayerContainer = document.createElement('div');
-    audioPlayerContainer.style.cssText = `
-      width: 100%;
-      margin: 10px 0;
-    `;
-    
-    // Player de áudio
-    audioPlayer = document.createElement('audio');
-    audioPlayer.controls = true;
-    audioPlayer.src = URL.createObjectURL(blob);
-    audioPlayer.style.cssText = `
-      width: 100%;
-      height: 40px;
-    `;
-    
-    audioPlayerContainer.appendChild(audioPlayer);
-    floatingAudioContainer.appendChild(audioPlayerContainer);
-    
-    // Texto indicativo
-    const helpText = document.createElement('div');
-    helpText.style.cssText = `
-      font-size: 12px;
-      color: #666;
-      text-align: center;
-      margin-bottom: 10px;
-      width: 100%;
-    `;
-    helpText.textContent = 'Ouça o áudio antes de enviar';
-    floatingAudioContainer.appendChild(helpText);
-    
-    // Container para botões
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin-top: 5px;
-    `;
-    
-    // Botão cancelar
-    const cancelButton = document.createElement('button');
-    cancelButton.type = 'button';
-    cancelButton.style.cssText = `
-      background-color: #f0f0f0;
-      border: none;
-      border-radius: 4px;
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-      margin-right: 8px;
-    `;
-    cancelButton.textContent = 'Descartar';
-    cancelButton.title = 'Descartar áudio';
-    cancelButton.onclick = () => {
-      removerJanelaFlutuante();
-      restaurarBotoesChat();
-    };
-    
-    // Botão enviar
-    sendAudioButton = document.createElement('button');
-    sendAudioButton.type = 'button';
-    sendAudioButton.style.cssText = `
-      background-color: #25D366;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-    `;
-    sendAudioButton.textContent = 'Enviar';
-    sendAudioButton.title = 'Enviar áudio';
-    sendAudioButton.onclick = () => {
-      enviarAudioMensagem(file);
-    };
-    
-    buttonsContainer.appendChild(cancelButton);
-    buttonsContainer.appendChild(sendAudioButton);
-    floatingAudioContainer.appendChild(buttonsContainer);
-    
-    // Inicia a reprodução automaticamente
-    try {
-      audioPlayer.play();
-    } catch(e) {
-      console.log('[3CX Audio Extension] Auto-play falhou:', e);
-    }
-  }
-  
-  console.log('[3CX Audio Extension] Janela flutuante atualizada');
-}
-
-// ... existing code ...
-
-// Função para enviar o áudio como anexo
-function enviarAudioMensagem(audioFile) {
-  try {
-    console.log('[3CX Audio Extension] Preparando para enviar áudio');
-    
-    if (!audioFile) {
-      console.error('[3CX Audio Extension] Arquivo de áudio não encontrado');
-      alert('Erro: Não foi possível encontrar o arquivo de áudio para envio.');
-      return;
-    }
-    
-    // Método 1: Tenta usar DataTransfer para simular drop do arquivo
-    const dt = new DataTransfer();
-    dt.items.add(audioFile);
-    
-    // Encontrar o campo de entrada para soltar o arquivo
-    const chatInput = document.querySelector('.message-input[contenteditable="true"], [data-qa="input_restriction"]');
-    if (chatInput) {
-      console.log('[3CX Audio Extension] Tentando método de anexar via DataTransfer');
-      
-      // Cria e dispara evento de drop
-      const dropEvt = new DragEvent('drop', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: dt
-      });
-      
-      chatInput.dispatchEvent(dropEvt);
-      
-      // Remover a janela flutuante após enviar
-      setTimeout(() => {
-        removerJanelaFlutuante();
-        restaurarBotoesChat();
-      }, 500);
-      
-      return;
-    }
-    
-    // Método 2: Tentar encontrar o input file
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput) {
-      console.log('[3CX Audio Extension] Tentando método via input file');
-      
-      // Cria uma lista de arquivos e substitui a propriedade files do input
-      const fileList = new DataTransfer();
-      fileList.items.add(audioFile);
-      
-      // Substitui files do input e dispara evento change
-      try {
-        Object.defineProperty(fileInput, 'files', {
-          value: fileList.files,
-          writable: false
-        });
-        
-        const changeEvent = new Event('change', { bubbles: true });
-        fileInput.dispatchEvent(changeEvent);
-        
-        // Remover a janela flutuante após enviar
-        setTimeout(() => {
-          removerJanelaFlutuante();
-          restaurarBotoesChat();
-        }, 500);
-        
-        return;
-      } catch (e) {
-        console.error('[3CX Audio Extension] Erro ao definir files do input:', e);
-      }
-    }
-    
-    // Método 3: Tentar simular um clique no botão de anexo
-    const attachButton = document.querySelector('button[app-paperclip-light-icon], button[title*="Anexar"], button[aria-label*="Anexar"]');
-    if (attachButton) {
-      console.log('[3CX Audio Extension] Tentando método via botão de anexo');
-      
-      // Alerta para guiar usuário
-      alert('O sistema automático de envio falhou. Por favor, após clicar em OK, selecione o arquivo de áudio que acabamos de salvar na sua pasta de Downloads.');
-      
-      // Simula o clique no botão de anexo
-      attachButton.click();
-      
-      // Remover a janela flutuante após enviar
-      setTimeout(() => {
-        removerJanelaFlutuante();
-        restaurarBotoesChat();
-      }, 500);
-      
-      return;
-    }
-    
-    // Se todos os métodos falharam, tenta salvar o arquivo e instruir o usuário
-    console.error('[3CX Audio Extension] Todos os métodos de envio automático falharam');
-    
-    // Cria um link para download do áudio
-    const audioUrl = URL.createObjectURL(audioFile);
-    const a = document.createElement('a');
-    a.href = audioUrl;
-    a.download = audioFile.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    alert('O sistema automático de envio falhou. O áudio foi salvo na sua pasta de Downloads. Por favor, anexe-o manualmente através do botão de anexo.');
-    
-    // Remover a janela flutuante após salvar
-    setTimeout(() => {
-      removerJanelaFlutuante();
-      restaurarBotoesChat();
-    }, 1000);
-    
-  } catch (error) {
-    console.error('[3CX Audio Extension] Erro ao enviar áudio:', error);
-    alert('Ocorreu um erro ao tentar enviar o áudio. Por favor, tente novamente.');
-    
-    // Remover janela flutuante em caso de erro
-    removerJanelaFlutuante();
-    restaurarBotoesChat();
-  }
-}
-
-// Funções para controle do timer de gravação
-function iniciarTimerGravacao() {
-  pararTimerGravacao();
-  gravacaoTempo = 0;
-  
-  gravacaoTimer = setInterval(() => {
-    gravacaoTempo++;
-    
-    if (gravacaoTimerSpan) {
-      gravacaoTimerSpan.textContent = formatarDuracao(gravacaoTempo);
-    }
-  }, 1000);
-}
-
-function pararTimerGravacao() {
-  if (gravacaoTimer) {
-    clearInterval(gravacaoTimer);
-    gravacaoTimer = null;
-  }
-}
-
-// Função para formatar a duração em MM:SS
-function formatarDuracao(segundos) {
-  const mins = Math.floor(segundos / 60).toString().padStart(2, '0');
-  const secs = (segundos % 60).toString().padStart(2, '0');
-  return `${mins}:${secs}`;
-}
-
-// Função para alternar entre pausar e retomar a gravação
-function togglePauseGravacao() {
-  if (!mediaRecorder) return;
-  
-  try {
-    if (isPaused) {
-      // Retomar gravação
-      mediaRecorder.resume();
-      isPaused = false;
-      
-      // Adicionar tempo pausado ao contador
-      if (pausaTimestamp) {
-        tempoPausado += (Date.now() - pausaTimestamp) / 1000;
-        pausaTimestamp = null;
-      }
-      
-      // Atualizar botão
-      if (pauseResumeButton) {
-        pauseResumeButton.innerHTML = SVG_PAUSE_CONTENT;
-        pauseResumeButton.title = 'Pausar gravação';
-      }
-    } else {
-      // Pausar gravação
-      mediaRecorder.pause();
-      isPaused = true;
-      pausaTimestamp = Date.now();
-      
-      // Atualizar botão
-      if (pauseResumeButton) {
-        pauseResumeButton.innerHTML = SVG_RESUME_CONTENT;
-        pauseResumeButton.title = 'Retomar gravação';
-      }
-    }
-    
-    console.log(`[3CX Audio Extension] Gravação ${isPaused ? 'pausada' : 'retomada'}`);
-    return true;
-  } catch (error) {
-    console.error('[3CX Audio Extension] Erro ao alternar pausa/retomada:', error);
-    return false;
-  }
+    // Substitui o conteúdo do file-message pelo player customizado
+    fm.innerHTML = '';
+    fm.appendChild(previewContainer);
+  });
 }
 
 // ... existing code ...
