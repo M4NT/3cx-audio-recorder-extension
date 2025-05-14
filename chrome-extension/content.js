@@ -82,21 +82,70 @@ function ensureMaterialIcons() {
   }
 }
 
-// Função para verificar permissões manualmente (adicionada para Chrome)
+// Adicionar um modo de forçar a detecção
+let forcarDeteccao = true; // Define como true para ignorar parte das verificações de dispositivo
+
+// Função simplificada para verificar dispositivos de áudio disponíveis
+async function verificarDispositivosAudio() {
+  try {
+    console.log('[3CX Audio Extension] Verificando dispositivos de áudio disponíveis...');
+    
+    // Se forcarDeteccao está habilitado, retorna true para permitir tentativa de gravação
+    if (forcarDeteccao) {
+      console.log('[3CX Audio Extension] Modo de força ativado - assumindo que há dispositivos disponíveis');
+      return true;
+    }
+    
+    // Verifica se o navegador suporta a API de enumeração de dispositivos
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      console.error('[3CX Audio Extension] API de enumeração de dispositivos não suportada');
+      // Mesmo sem suporte, permitimos tentar a gravação
+      return true;
+    }
+    
+    // Tenta obter a lista de dispositivos sem pedir permissão primeiro
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+    
+    console.log(`[3CX Audio Extension] Dispositivos de áudio encontrados: ${audioInputDevices.length}`);
+    
+    // Mesmo que não encontre dispositivos nessa lista, vamos permitir tentar gravar
+    // já que alguns navegadores não mostram dispositivos sem permissão
+    return true;
+  } catch (error) {
+    console.error('[3CX Audio Extension] Erro ao verificar dispositivos de áudio:', error);
+    // Mesmo com erro, permitimos tentar a gravação
+    return true;
+  }
+}
+
+// Função simplificada para verificar permissões do microfone
 async function verificarPermissaoDeMicrofone() {
   try {
     console.log('[3CX Audio Extension] Verificando status atual de permissão...');
-    const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
     
-    if (permissionStatus.state === 'granted') {
-      console.log('[3CX Audio Extension] Permissão já concedida anteriormente');
-      return true;
-    } else if (permissionStatus.state === 'prompt') {
-      console.log('[3CX Audio Extension] Permissão ainda não foi solicitada');
-      return null; // Precisaremos solicitar
+    if (forcarDeteccao) {
+      console.log('[3CX Audio Extension] Modo de força ativado - assumindo permissão ausente');
+      return null; // Null significa que precisamos solicitar permissão
+    }
+    
+    // Verifica permissões apenas se a API estiver disponível
+    if (navigator.permissions && navigator.permissions.query) {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+      
+      if (permissionStatus.state === 'granted') {
+        console.log('[3CX Audio Extension] Permissão já concedida anteriormente');
+        return true;
+      } else if (permissionStatus.state === 'prompt') {
+        console.log('[3CX Audio Extension] Permissão ainda não foi solicitada');
+        return null; // Precisaremos solicitar
+      } else {
+        console.log('[3CX Audio Extension] Permissão negada anteriormente');
+        return false;
+      }
     } else {
-      console.log('[3CX Audio Extension] Permissão negada anteriormente');
-      return false;
+      // Se a API não estiver disponível, assumimos que não temos permissão ainda
+      return null;
     }
   } catch (error) {
     console.log('[3CX Audio Extension] Erro ao verificar permissão:', error);
@@ -104,7 +153,7 @@ async function verificarPermissaoDeMicrofone() {
   }
 }
 
-// Função para criar e injetar o botão de gravação de áudio na barra de chat
+// Função para criar e injetar o botão de gravação
 function injectRecordButton() {
   console.log("[3CX Audio Extension] Tentando injetar botão de gravação...");
 
@@ -123,58 +172,46 @@ function injectRecordButton() {
 
   console.log('[3CX Audio Extension] Criando botão de gravação...');
 
-  // Cria o botão de gravação
+  // Cria o botão de gravação - sempre habilitado
   recordButton = document.createElement('button');
   recordButton.type = 'button';
   recordButton.id = 'audioRecordButton';
   recordButton.className = 'btn btn-plain';
   recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+  recordButton.title = 'Gravar áudio';
+  recordButton.disabled = false;
+  recordButton.style.cursor = 'pointer';
 
-  // Atualiza o botão com base na disponibilidade ao ser criado
-  if (!gravacaoDisponivel) {
-    recordButton.innerHTML = `<span class="record-svg">${SVG_ERROR_CONTENT}</span>`;
-    recordButton.title = mensagemStatusGravacao;
-    recordButton.disabled = true;
-    recordButton.style.cursor = 'not-allowed';
-  } else {
-    recordButton.title = 'Gravar áudio';
-    recordButton.disabled = false;
-    recordButton.style.cursor = 'pointer';
-  }
-
-  // Adiciona o manipulador de evento (mantendo as melhorias)
+  // Adiciona o manipulador de evento (simplificado para garantir funcionamento)
   recordButton.addEventListener('click', async function() {
-    if (!gravacaoDisponivel) {
-      alert(mensagemStatusGravacao);
-      return;
-    }
-
-    recordButton.disabled = true; // Desabilita durante a ação
-
-    if (isRecording) {
-      recordButton.title = 'Parando gravação...';
-      await stopRecording();
-    } else {
-      recordButton.title = 'Iniciando gravação...';
-      
-      // Verifica permissão novamente apenas para Chrome
-      const isChrome = navigator.userAgent.toLowerCase().indexOf('chrome') > -1;
-      if (isChrome) {
-        const permissionState = await verificarPermissaoDeMicrofone();
-        if (permissionState === false) {
-          alert("A permissão para usar o microfone foi negada anteriormente. Por favor, clique no ícone de cadeado na barra de endereço e permita o acesso ao microfone para este site.");
-          recordButton.disabled = false;
-          return;
+    console.log('[3CX Audio Extension] Botão de gravação clicado');
+    
+    // Desabilita temporariamente o botão para evitar cliques múltiplos
+    recordButton.disabled = true;
+    
+    try {
+      if (isRecording) {
+        // Se estiver gravando, para a gravação
+        console.log('[3CX Audio Extension] Parando gravação...');
+        recordButton.title = 'Parando gravação...';
+        await stopRecording();
+      } else {
+        // Inicia nova gravação
+        console.log('[3CX Audio Extension] Iniciando gravação...');
+        recordButton.title = 'Iniciando gravação...';
+        const result = await startRecording();
+        
+        if (!result.success) {
+          alert(`Erro ao iniciar gravação: ${result.error}`);
         }
       }
-      
-      const result = await startRecording();
-      if (!result.success) {
-        alert(`Erro ao iniciar gravação: ${result.error}`);
-      }
+    } catch (error) {
+      console.error('[3CX Audio Extension] Erro ao manipular clique no botão:', error);
+      alert('Ocorreu um erro ao processar o áudio. Por favor, tente novamente.');
+    } finally {
+      // Sempre reabilita o botão ao final
+      recordButton.disabled = false;
     }
-    
-    // O botão será reabilitado pela função startRecording ou stopRecording
   });
 
   // Insere o botão logo após o botão de template
@@ -627,76 +664,32 @@ function removerJanelaFlutuante() {
   }
 }
 
-// Função para verificar dispositivos de áudio disponíveis
-async function verificarDispositivosAudio() {
-  try {
-    console.log('[3CX Audio Extension] Verificando dispositivos de áudio disponíveis...');
-    
-    // Verifica se o navegador suporta a API de enumeração de dispositivos
-    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-      console.error('[3CX Audio Extension] API de enumeração de dispositivos não suportada');
-      return false;
-    }
-    
-    // Obtém a lista de dispositivos
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    
-    // Filtra apenas os dispositivos de entrada de áudio (microfones)
-    const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
-    
-    console.log(`[3CX Audio Extension] Dispositivos de áudio encontrados: ${audioInputDevices.length}`);
-    
-    if (audioInputDevices.length === 0) {
-      console.error('[3CX Audio Extension] Nenhum dispositivo de áudio encontrado');
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('[3CX Audio Extension] Erro ao verificar dispositivos de áudio:', error);
-    return false;
-  }
-}
-
 // Função para iniciar a gravação
 async function startRecording() {
   try {
     console.log('[3CX Audio Extension] Iniciando gravação...');
     
-    // Verifica primeiro se há dispositivos disponíveis
-    const dispositivosDisponiveis = await verificarDispositivosAudio();
-    if (!dispositivosDisponiveis) {
-      throw new Error('Nenhum microfone encontrado. Verifique se há um microfone conectado e funcionando no seu computador.');
-    }
-    
-    // Mostra algum feedback visual imediato para o usuário
+    // Mostra feedback visual para o usuário
     const mainRecordButton = document.querySelector('#audioRecordButton');
     if (mainRecordButton) {
       mainRecordButton.disabled = true;
       mainRecordButton.title = 'Iniciando gravação...';
     }
     
-    // Tenta obter acesso ao microfone com diferentes configurações
-    const acessoMicrofone = await tentarAcessarMicrofone();
-    if (!acessoMicrofone.success) {
-      throw acessoMicrofone.error || new Error('Não foi possível acessar o microfone.');
-    }
-    
-    // Tenta novamente com a configuração que funcionou para iniciar a gravação
-    console.log('[3CX Audio Extension] Solicitando stream de áudio para gravação...');
+    // SIMPLIFICADO: Solicitação direta de acesso ao microfone
+    console.log('[3CX Audio Extension] Solicitando acesso ao microfone...');
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
-    // Detecta o melhor formato suportado
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-      ? 'audio/webm;codecs=opus' 
-      : 'audio/webm';
+    // Formato mais compatível
+    let mimeType = 'audio/webm';
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      mimeType = 'audio/webm;codecs=opus';
+    }
     
     console.log(`[3CX Audio Extension] Usando formato: ${mimeType}`);
     
-    mediaRecorder = new MediaRecorder(audioStream, {
-      mimeType: mimeType
-    });
-    
+    // Configurações básicas para o MediaRecorder
+    mediaRecorder = new MediaRecorder(audioStream);
     audioChunks = [];
     
     mediaRecorder.ondataavailable = (event) => {
@@ -1508,90 +1501,118 @@ async function solicitarPermissaoAudio() {
 async function inicializarExtensao() {
   console.log('[3CX Audio Extension] Iniciando verificação de suporte e permissões...');
   
-  let suporteOk = verificarSuporteGravação();
-  let dispositivosOk = false;
-  let permissaoOk = false;
-
-  if (!suporteOk) {
-    mensagemStatusGravacao = 'Seu navegador não suporta os recursos necessários para gravação de áudio.';
-    console.error('[3CX Audio Extension] Falha na verificação de suporte: ', mensagemStatusGravacao);
-    gravacaoDisponivel = false;
-  } else {
-    console.log('[3CX Audio Extension] Suporte de gravação verificado com sucesso');
+  try {
+    // Simplificamos a verificação de suporte - a maioria dos navegadores modernos suporta
+    let suporteOk = true;
+    if (typeof MediaRecorder === 'undefined') {
+      suporteOk = false;
+      console.log('[3CX Audio Extension] MediaRecorder não disponível neste navegador');
+    }
     
-    // Verifica se existem dispositivos de áudio
-    dispositivosOk = await verificarDispositivosAudio();
-    
-    if (!dispositivosOk) {
-      mensagemStatusGravacao = 'Nenhum microfone encontrado. Verifique se há um microfone conectado ao seu computador.';
-      console.error('[3CX Audio Extension] Falha na verificação de dispositivos: ', mensagemStatusGravacao);
+    if (!suporteOk) {
+      mensagemStatusGravacao = 'Seu navegador não suporta os recursos necessários para gravação de áudio.';
+      console.error('[3CX Audio Extension] Falha na verificação de suporte: ', mensagemStatusGravacao);
       gravacaoDisponivel = false;
     } else {
-      // Verifica o estado atual da permissão antes de solicitar
-      const permissionState = await verificarPermissaoDeMicrofone();
+      console.log('[3CX Audio Extension] Suporte de gravação verificado com sucesso');
       
-      // Já tem permissão
-      if (permissionState === true) {
-        permissaoOk = true;
+      // No modo de força, consideramos a gravação disponível
+      if (forcarDeteccao) {
         gravacaoDisponivel = true;
         mensagemStatusGravacao = 'Gravação de áudio pronta.';
-      } 
-      // Permissão negada anteriormente 
-      else if (permissionState === false) {
-        permissaoOk = false;
-        gravacaoDisponivel = false;
-        mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do navegador.';
-      } 
-      // Permissão desconhecida ou nunca solicitada
-      else {
-        permissaoOk = await solicitarPermissaoAudio();
-        if (!permissaoOk) {
-          console.error(`[3CX Audio Extension] Falha na permissão de áudio: ${mensagemStatusGravacao}`);
-          gravacaoDisponivel = false;
-        } else {
+        console.log('[3CX Audio Extension] Disponibilidade de gravação forçada');
+      } else {
+        // Verificação simplificada de permissão
+        const permissionState = await verificarPermissaoDeMicrofone();
+        
+        if (permissionState === true) {
+          // Já tem permissão
           gravacaoDisponivel = true;
           mensagemStatusGravacao = 'Gravação de áudio pronta.';
+        } else if (permissionState === false) {
+          // Permissão negada anteriormente
+          gravacaoDisponivel = false;
+          mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do navegador.';
+        } else {
+          // Permissão desconhecida - consideramos disponível para tentar quando clicar no botão
+          gravacaoDisponivel = true;
+          mensagemStatusGravacao = 'Clique para gravar áudio.';
         }
       }
     }
-  }
-
-  // Atualiza o botão de gravação
-  const buttonToUpdate = document.querySelector('#audioRecordButton');
-  if (buttonToUpdate) {
-    if (gravacaoDisponivel) {
+    
+    // Atualiza o botão de gravação
+    const buttonToUpdate = document.querySelector('#audioRecordButton');
+    if (buttonToUpdate) {
+      if (gravacaoDisponivel) {
+        buttonToUpdate.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+        buttonToUpdate.title = 'Gravar áudio';
+        buttonToUpdate.disabled = false;
+        buttonToUpdate.style.cursor = 'pointer';
+        buttonToUpdate.classList.remove('recording');
+      } else {
+        buttonToUpdate.innerHTML = `<span class="record-svg">${SVG_ERROR_CONTENT}</span>`;
+        buttonToUpdate.title = mensagemStatusGravacao;
+        buttonToUpdate.disabled = true;
+        buttonToUpdate.style.cursor = 'not-allowed';
+        buttonToUpdate.classList.remove('recording');
+      }
+    }
+    
+    console.log(`[3CX Audio Extension] Inicialização completa. Gravação disponível: ${gravacaoDisponivel}, Motivo: ${mensagemStatusGravacao}`);
+  
+  } catch (error) {
+    console.error('[3CX Audio Extension] Erro durante inicialização:', error);
+    // Mesmo com erro, tentamos habilitar a gravação
+    gravacaoDisponivel = true;
+    mensagemStatusGravacao = 'Gravação de áudio disponível.';
+    
+    // Atualiza o botão para indicar disponibilidade
+    const buttonToUpdate = document.querySelector('#audioRecordButton');
+    if (buttonToUpdate) {
       buttonToUpdate.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
       buttonToUpdate.title = 'Gravar áudio';
       buttonToUpdate.disabled = false;
       buttonToUpdate.style.cursor = 'pointer';
-      buttonToUpdate.classList.remove('recording');
-    } else {
-      buttonToUpdate.innerHTML = `<span class="record-svg">${SVG_ERROR_CONTENT}</span>`;
-      buttonToUpdate.title = mensagemStatusGravacao;
-      buttonToUpdate.disabled = true;
-      buttonToUpdate.style.cursor = 'not-allowed';
-      buttonToUpdate.classList.remove('recording');
     }
   }
+}
+
+// Força reinicialização da extensão e recria o botão
+function reinicializarExtensao() {
+  console.log('[3CX Audio Extension] Reinicializando extensão...');
   
-  console.log(`[3CX Audio Extension] Inicialização completa. Gravação disponível: ${gravacaoDisponivel}, Motivo: ${mensagemStatusGravacao}`);
-}
-
-// Inicia a extensão quando o DOM estiver pronto
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', inicializarExtensao);
-} else {
-  inicializarExtensao();
-}
-
-// Função para ajustar o espaço na barra de input do chat
-function adjustChatInputSpace() {
-  // Encontra o contêiner de input para ajustar seu tamanho
-  const inputContainer = document.querySelector('.ChatInput-InputWrapper');
-  if (inputContainer) {
-    // Reduz levemente a largura para acomodar o botão de áudio
-    inputContainer.style.width = 'calc(100% - 40px)';
+  // Remove o botão atual se existir
+  const botaoAtual = document.querySelector('#audioRecordButton');
+  if (botaoAtual && botaoAtual.parentNode) {
+    botaoAtual.parentNode.removeChild(botaoAtual);
   }
+  
+  // Reinicia a extensão
+  inicializarExtensao().then(() => {
+    // Tenta injetar o botão novamente
+    injectRecordButton();
+  });
+}
+
+// Adicionar botão de reinicialização no setupObserver
+function setupObserver() {
+  // Código existente...
+  console.log("[3CX Audio Extension] Configurando observador para interface do 3CX...");
+
+  // Adiciona os estilos CSS imediatamente 
+  addAudioStyles();
+  
+  // Inicia a extensão (verificação de permissões)
+  inicializarExtensao();
+
+  // Verifica e tenta injetar o botão imediatamente se possível
+  injectRecordButton();
+  
+  // Adiciona tentativa de reinicialização após 5 segundos
+  setTimeout(reinicializarExtensao, 5000);
+
+  // Resto do código existente...
 }
 
 // Adiciona estilos CSS necessários
@@ -1725,6 +1746,9 @@ function setupObserver() {
 
   // Verifica e tenta injetar o botão imediatamente se possível
   injectRecordButton();
+  
+  // Adiciona tentativa de reinicialização após 5 segundos
+  setTimeout(reinicializarExtensao, 5000);
 
   // Configura o observador de mutações para detectar quando o chat está pronto
   const observer = new MutationObserver(function(mutations) {
@@ -1850,3 +1874,13 @@ if (document.readyState === 'loading') {
     setupObserver();
   }
 } 
+
+// Função para ajustar o espaço na barra de input do chat (restaurado)
+function adjustChatInputSpace() {
+  // Encontra o contêiner de input para ajustar seu tamanho
+  const inputContainer = document.querySelector('.ChatInput-InputWrapper');
+  if (inputContainer) {
+    // Reduz levemente a largura para acomodar o botão de áudio
+    inputContainer.style.width = 'calc(100% - 40px)';
+  }
+}
