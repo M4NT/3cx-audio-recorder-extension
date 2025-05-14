@@ -29,6 +29,13 @@ let isPaused = false;
 let tempoPausado = 0;
 let pausaTimestamp = null;
 
+// Novas variáveis globais para estado da gravação e constantes de ícones
+let gravacaoDisponivel = false;
+let mensagemStatusGravacao = 'Gravação de áudio não inicializada.';
+
+const SVG_MIC_CONTENT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15C13.66 15 15 13.66 15 12V7C15 5.34 13.66 4 12 4C10.34 4 9 5.34 9 7V12C9 13.66 10.34 15 12 15Z"/><path d="M17.3 11C17.3 14.03 14.87 16.3 12 16.3C9.13 16.3 6.7 14.03 6.7 11H5C5 14.53 7.61 17.43 11 17.93V20H13V17.93C16.39 17.43 19 14.53 19 11H17.3Z"/></svg>';
+const SVG_ERROR_CONTENT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
+
 // Função para criar o indicador de gravação
 function createRecordingIndicator() {
   const indicator = document.createElement('div');
@@ -90,16 +97,19 @@ function injectRecordButton() {
   recordButton.type = 'button';
   recordButton.id = 'audioRecordButton';
   recordButton.className = 'btn btn-plain';
-  recordButton.title = 'Gravar áudio';
-  recordButton.innerHTML = `
-    <span class="record-svg" style="display:inline-flex;align-items:center;justify-content:center;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" fill="none"/>
-        <path d="M12 15C13.66 15 15 13.66 15 12V7C15 5.34 13.66 4 12 4C10.34 4 9 5.34 9 7V12C9 13.66 10.34 15 12 15Z" fill="currentColor"/>
-        <path d="M17.3 11C17.3 14.03 14.87 16.3 12 16.3C9.13 16.3 6.7 14.03 6.7 11H5C5 14.53 7.61 17.43 11 17.93V20H13V17.93C16.39 17.43 19 14.53 19 11H17.3Z" fill="currentColor"/>
-      </svg>
-    </span>
-  `;
+  recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+
+  // Atualiza o botão com base na disponibilidade ao ser criado
+  if (!gravacaoDisponivel) {
+    recordButton.innerHTML = `<span class="record-svg">${SVG_ERROR_CONTENT}</span>`;
+    recordButton.title = mensagemStatusGravacao;
+    recordButton.disabled = true;
+    recordButton.style.cursor = 'not-allowed';
+  } else {
+    recordButton.title = 'Gravar áudio';
+    recordButton.disabled = false;
+    recordButton.style.cursor = 'pointer';
+  }
 
   // Adiciona estilos
   const style = document.createElement('style');
@@ -205,28 +215,49 @@ function injectRecordButton() {
 
   // Adiciona o event listener
   recordButton.addEventListener('click', async () => {
-    if (!isRecording) {
-      try {
-        const result = await startRecording();
-        if (result.success) {
-          isRecording = true;
-          recordButton.classList.add('recording');
-          recordButton.title = 'Parar gravação';
-        }
-      } catch (error) {
-        console.error('Erro ao iniciar gravação:', error);
+    if (!gravacaoDisponivel) {
+      alert(mensagemStatusGravacao);
+      return;
+    }
+
+    recordButton.disabled = true; // Desabilita durante a ação
+
+    if (isRecording) {
+      recordButton.title = 'Parando gravação...';
+      // recordButton.innerHTML = 'Parando...'; // Feedback visual pode ser via title ou console
+      const result = await stopRecording();
+      if (!result.success) {
+        alert(`Erro ao parar gravação: ${result.error}`);
+        // Mantém o estado de gravação visualmente se falhar, mas permite nova tentativa
+        recordButton.classList.add('recording'); // Garante que o ícone fique vermelho
+        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+        recordButton.title = 'Parar gravação (erro anterior)';
+      } else {
+        isRecording = false;
+        recordButton.classList.remove('recording');
+        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+        recordButton.title = 'Gravar áudio';
       }
     } else {
-      try {
-        const result = await stopRecording();
-        if (result.success) {
-          isRecording = false;
-          recordButton.classList.remove('recording');
-          recordButton.title = 'Gravar áudio';
-        }
-      } catch (error) {
-        console.error('Erro ao parar gravação:', error);
+      recordButton.title = 'Iniciando gravação...';
+      // recordButton.innerHTML = 'Iniciando...';
+      const result = await startRecording();
+      if (result.success) {
+        isRecording = true;
+        recordButton.classList.add('recording');
+        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`; // SVG do microfone, CSS cuida da cor
+        recordButton.title = 'Parar gravação';
+      } else {
+        alert(`Erro ao iniciar gravação: ${result.error}`);
+        isRecording = false; // Garante que o estado seja resetado
+        recordButton.classList.remove('recording');
+        recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+        recordButton.title = 'Gravar áudio (erro ao iniciar)';
       }
+    }
+    // Reabilita após a ação, a menos que um erro grave tenha tornado a gravação indisponível (tratado por inicializarExtensao)
+    if (gravacaoDisponivel) {
+        recordButton.disabled = false;
     }
   });
 
@@ -326,15 +357,7 @@ function restaurarBotoesChat() {
     recordButton.classList.remove('recording');
     recordButton.title = 'Gravar áudio';
     // Restaurar conteúdo original
-    recordButton.innerHTML = `
-      <span class="record-svg" style="display:inline-flex;align-items:center;justify-content:center;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="24" height="24" fill="none"/>
-          <path d="M12 15C13.66 15 15 13.66 15 12V7C15 5.34 13.66 4 12 4C10.34 4 9 5.34 9 7V12C9 13.66 10.34 15 12 15Z" fill="currentColor"/>
-          <path d="M17.3 11C17.3 14.03 14.87 16.3 12 16.3C9.13 16.3 6.7 14.03 6.7 11H5C5 14.53 7.61 17.43 11 17.93V20H13V17.93C16.39 17.43 19 14.53 19 11H17.3Z" fill="currentColor"/>
-        </svg>
-      </span>
-    `;
+    recordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
   }
   chatBarOriginalWidth = null;
 }
@@ -1333,12 +1356,30 @@ async function solicitarPermissaoAudio() {
         autoGainControl: true,
         sampleRate: 44100,
         channelCount: 1
+        // Removidas opções específicas do goog que podem não ser universalmente suportadas
+        // latency: 0, // Pode causar problemas em alguns navegadores/sistemas
+        // googEchoCancellation: true,
+        // googAutoGainControl: true,
+        // googNoiseSuppression: true,
+        // googHighpassFilter: true
       } 
     });
-    stream.getTracks().forEach(track => track.stop());
+    stream.getTracks().forEach(track => track.stop()); // Libera o microfone
     return true;
   } catch (error) {
     console.error('Erro ao solicitar permissão de áudio:', error);
+    if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        mensagemStatusGravacao = 'Nenhum microfone encontrado. Verifique se um microfone está conectado e habilitado.';
+    } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        mensagemStatusGravacao = 'Permissão para usar o microfone foi negada. Verifique as configurações do seu navegador.';
+        // alert(mensagemStatusGravacao); // O alerta será dado em inicializarExtensao se for o caso.
+    } else if (error.name === 'AbortError') {
+        mensagemStatusGravacao = 'Solicitação de permissão de microfone abortada.';
+    } else if (error.name === 'NotReadableError') {
+        mensagemStatusGravacao = 'O microfone está sendo usado por outro aplicativo ou houve um erro de hardware.';
+    } else {
+        mensagemStatusGravacao = `Erro de acesso ao microfone: ${error.name} - ${error.message}`;
+    }
     return false;
   }
 }
@@ -1346,17 +1387,43 @@ async function solicitarPermissaoAudio() {
 // Inicialização da extensão
 async function inicializarExtensao() {
   if (!verificarSuporteGravação()) {
-    console.error('Navegador não suporta gravação de áudio');
-    return;
+    mensagemStatusGravacao = 'Seu navegador não suporta os recursos necessários para gravação de áudio.';
+    console.error(mensagemStatusGravacao);
+    gravacaoDisponivel = false;
+  } else {
+    const temPermissao = await solicitarPermissaoAudio();
+    if (!temPermissao) {
+      // mensagemStatusGravacao já foi definida em solicitarPermissaoAudio
+      console.error(`Falha na inicialização: ${mensagemStatusGravacao}`);
+      gravacaoDisponivel = false;
+      // Alerta específico para negação de permissão persistente
+      if (mensagemStatusGravacao.includes("Permissão para usar o microfone foi negada")) {
+        alert("A permissão para usar o microfone foi negada. A gravação de áudio não funcionará até que a permissão seja concedida nas configurações do site para este domínio.");
+      }
+    } else {
+      gravacaoDisponivel = true;
+      mensagemStatusGravacao = 'Gravação de áudio pronta.';
+      console.log('[3CX Audio Extension] Inicializada com sucesso. Gravação disponível.');
+    }
   }
-  
-  const temPermissao = await solicitarPermissaoAudio();
-  if (!temPermissao) {
-    console.error('Permissão de áudio negada');
-    return;
+
+  // Atualiza o botão de gravação, se já existir no DOM
+  const existingRecordButton = document.querySelector('#audioRecordButton');
+  if (existingRecordButton) {
+    if (gravacaoDisponivel) {
+      existingRecordButton.innerHTML = `<span class="record-svg">${SVG_MIC_CONTENT}</span>`;
+      existingRecordButton.title = 'Gravar áudio';
+      existingRecordButton.disabled = false;
+      existingRecordButton.style.cursor = 'pointer';
+      existingRecordButton.classList.remove('recording'); // Garante que não comece no estado de gravação
+    } else {
+      existingRecordButton.innerHTML = `<span class="record-svg">${SVG_ERROR_CONTENT}</span>`;
+      existingRecordButton.title = mensagemStatusGravacao;
+      existingRecordButton.disabled = true;
+      existingRecordButton.style.cursor = 'not-allowed';
+      existingRecordButton.classList.remove('recording');
+    }
   }
-  
-  console.log('[3CX Audio Extension] Inicializada com sucesso');
 }
 
 // Inicia a extensão quando o DOM estiver pronto
