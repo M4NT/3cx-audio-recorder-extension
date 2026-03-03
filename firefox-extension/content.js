@@ -169,6 +169,39 @@ if (document.readyState === 'loading') {
   startObserving();
 }
 
+// Atalho de teclado na aba do 3CX: Alt+Shift+R para iniciar/parar gravação
+function registrarAtalhoTecladoGravacao() {
+  if (window.__threecxHotkeyRegistered) return;
+  window.__threecxHotkeyRegistered = true;
+
+  document.addEventListener('keydown', (event) => {
+    // Ignora se o usuário estiver digitando em campos de texto/editáveis
+    const target = event.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    const isAltShiftR =
+      event.altKey &&
+      event.shiftKey &&
+      (event.key === 'r' || event.key === 'R');
+
+    if (!isAltShiftR) return;
+
+    event.preventDefault();
+    const recordBtn = document.querySelector('#audioRecordButton');
+    if (!recordBtn || recordBtn.disabled) return;
+
+    try {
+      recordBtn.click();
+    } catch (e) {
+      console.error('[3CX Audio Extension] Erro ao acionar atalho de gravação:', e);
+    }
+  });
+}
+
+registrarAtalhoTecladoGravacao();
+
 // Função para tocar um beep ao finalizar gravação
 function beep() {
   try {
@@ -273,14 +306,133 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
   floatingAudioContainer.style.transform = 'translateX(-50%)';
   floatingAudioContainer.style.background = '#f8fafc';
   floatingAudioContainer.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-  floatingAudioContainer.style.borderRadius = '24px';
-  floatingAudioContainer.style.padding = '16px 32px';
+  floatingAudioContainer.style.borderRadius = '20px';
+  floatingAudioContainer.style.padding = '12px 24px';
   floatingAudioContainer.style.display = 'flex';
   floatingAudioContainer.style.alignItems = 'center';
   floatingAudioContainer.style.zIndex = '99999';
-  floatingAudioContainer.style.gap = '18px';
-  floatingAudioContainer.style.minWidth = '340px';
+  floatingAudioContainer.style.gap = '12px';
+  floatingAudioContainer.style.minWidth = '280px';
   floatingAudioContainer.style.maxWidth = '90vw';
+
+  // Garante estilos consistentes para os botões da janela flutuante
+  if (!document.getElementById('threecx-audio-floating-style')) {
+    const style = document.createElement('style');
+    style.id = 'threecx-audio-floating-style';
+    style.textContent = `
+      .threecx-audio-container {
+        animation: threecx-audio-slide-in 160ms ease-out;
+      }
+      @keyframes threecx-audio-slide-in {
+        from { transform: translate(-50%, 10px); opacity: 0; }
+        to   { transform: translate(-50%, 0);    opacity: 1; }
+      }
+      .threecx-audio-btn {
+        border: none;
+        background: #e5ebf5;
+        border-radius: 999px;
+        width: 32px;  /* mais compacto */
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+        color: #111827;
+        transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+      }
+      .threecx-audio-btn:hover {
+        background: #d7e3f8;
+        box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+      }
+      .threecx-audio-btn:active {
+        transform: scale(0.95);
+        box-shadow: none;
+      }
+      .threecx-audio-btn svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+      .threecx-audio-btn--primary {
+        color: #ffffff;
+        background: #16a34a; /* verde para indicar enviar */
+      }
+      .threecx-audio-btn--primary:hover {
+        background: #15803d;
+      }
+      .threecx-audio-btn--danger {
+        color: #d32f2f;
+        background: #fee2e2;
+      }
+      .threecx-audio-btn--danger:hover {
+        background: #fecaca;
+      }
+      .threecx-audio-btn--ghost {
+        background: transparent;
+        color: #555;
+      }
+      .threecx-audio-btn--ghost:hover {
+        background: rgba(0,0,0,0.06);
+      }
+      /* Barra de progresso da pré-visualização, fina como na barra de gravação */
+      .threecx-audio-preview-range {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 110px;
+        height: 4px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        outline: none;
+        padding: 0;
+        margin: 0 8px;
+      }
+      .threecx-audio-preview-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: #2563eb;
+        border: 2px solid #f9fafb;
+        box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.5);
+        cursor: pointer;
+        margin-top: -4px;
+      }
+      .threecx-audio-preview-range::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: #2563eb;
+        border: 2px solid #f9fafb;
+        box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.5);
+        cursor: pointer;
+      }
+      .threecx-audio-preview-range::-moz-range-track {
+        height: 4px;
+        border-radius: 999px;
+        background: #e5e7eb;
+      }
+      /* Pulso suave no botão de parar enquanto grava */
+      .threecx-audio-btn--danger.is-recording {
+        animation: threecx-audio-pulse 1s infinite;
+      }
+      @keyframes threecx-audio-pulse {
+        0%   { transform: scale(1);   }
+        50%  { transform: scale(1.06);}
+        100% { transform: scale(1);   }
+      }
+      /* Foco visível para acessibilidade */
+      .threecx-audio-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Classe base para animação de entrada
+  floatingAudioContainer.classList.add('threecx-audio-container');
 
   if (tipo === 'recording') {
     const micIcon = document.createElement('span');
@@ -293,19 +445,20 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
     gravacaoTimerSpan.className = 'gravacao-timer-inline';
     gravacaoTimerSpan.style.fontWeight = 'bold';
     gravacaoTimerSpan.style.color = '#f44336';
-    gravacaoTimerSpan.style.fontSize = '20px';
+    gravacaoTimerSpan.style.fontSize = '18px';
     gravacaoTimerSpan.textContent = formatarDuracao(gravacaoTempo);
     floatingAudioContainer.appendChild(gravacaoTimerSpan);
     // Botão pausar/despausar
     pauseResumeButton = document.createElement('button');
+    pauseResumeButton.type = 'button';
+    pauseResumeButton.className = 'threecx-audio-btn';
     if (isPaused) {
-      pauseResumeButton.innerHTML = '<span title="Despausar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>';
-      pauseResumeButton.title = 'Despausar';
+      pauseResumeButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+      pauseResumeButton.title = 'Retomar';
     } else {
-      pauseResumeButton.innerHTML = '<span title="Pausar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg></span>';
+      pauseResumeButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>';
       pauseResumeButton.title = 'Pausar';
     }
-    pauseResumeButton.className = 'btn btn-plain';
     pauseResumeButton.onclick = () => {
       if (!isPaused && mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.pause();
@@ -323,18 +476,22 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
       }
     };
     floatingAudioContainer.appendChild(pauseResumeButton);
+
     // Botão parar
     stopButton = document.createElement('button');
-    stopButton.innerHTML = '<span title="Parar"><svg width="24" height="24" fill="#d32f2f" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></span>';
-    stopButton.className = 'btn btn-plain';
+    stopButton.type = 'button';
+    stopButton.className = 'threecx-audio-btn threecx-audio-btn--danger is-recording';
+    stopButton.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>';
     stopButton.title = 'Parar';
     stopButton.style.marginLeft = '8px';
     stopButton.onclick = () => { stopRecording(); };
     floatingAudioContainer.appendChild(stopButton);
+
     // Botão cancelar
     cancelarButton = document.createElement('button');
-    cancelarButton.innerHTML = '<span title="Cancelar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12l-4.89 4.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg></span>';
-    cancelarButton.className = 'btn btn-plain';
+    cancelarButton.type = 'button';
+    cancelarButton.className = 'threecx-audio-btn threecx-audio-btn--ghost';
+    cancelarButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12l-4.89 4.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg>';
     cancelarButton.title = 'Cancelar';
     cancelarButton.style.marginLeft = '8px';
     cancelarButton.onclick = () => {
@@ -343,80 +500,29 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
     floatingAudioContainer.appendChild(cancelarButton);
     floatingState = 'recording';
   } else if (tipo === 'preview' && audioBlob && audioFile) {
-    // Novo player customizado moderno
-    const previewContainer = document.createElement('div');
-    previewContainer.style.display = 'flex';
-    previewContainer.style.alignItems = 'center';
-    previewContainer.style.background = '#f8fafc';
-    previewContainer.style.borderRadius = '18px';
-    previewContainer.style.boxShadow = '0 2px 8px rgba(0,0,0,0.07)';
-    previewContainer.style.padding = '12px 20px';
-    previewContainer.style.gap = '16px';
-    previewContainer.style.width = '100%';
-    previewContainer.style.maxWidth = '520px';
-
-    // Ícone de microfone
+    // Layout de preview alinhado ao layout de gravação (mesmo container, sem "cartão" interno)
     const micIcon = document.createElement('span');
     micIcon.innerHTML = `<svg width="20" height="20" fill="#2196F3" viewBox="0 0 24 24"><path d="M12 15c1.66 0 3-1.34 3-3V7c0-1.66-1.34-3-3-3s-3 1.34-3 3v5c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.93V21h2v-2.07c3.39-.5 6-3.4 6-6.93h-2z"/></svg>`;
     micIcon.style.flex = 'none';
-    previewContainer.appendChild(micIcon);
+    floatingAudioContainer.appendChild(micIcon);
 
-    // Nome do usuário (apenas primeiro nome)
-    let nomeExibir = nomeUsuarioReal || 'Você';
-    if (nomeExibir !== 'Você') {
-      // Tenta buscar o nome real do participante no DOM
-      const participanteDiv = document.querySelector('#showParticipants');
-      if (participanteDiv) {
-        // Exemplo: "Pressendo, Ana Claudia 1003"
-        const texto = participanteDiv.textContent.trim();
-        // Pega só a parte depois da vírgula, remove números e pega o primeiro nome
-        const partes = texto.split(',');
-        if (partes.length > 1) {
-          const nomes = partes[1].replace(/\d+/g, '').trim().split(' ');
-          if (nomes.length > 0) nomeExibir = nomes[0];
-        }
-      } else {
-        // Fallback: pega só o primeiro nome do nomeUsuario
-        nomeExibir = nomeExibir.split(' ')[0];
-      }
-    }
-    const nome = document.createElement('span');
-    nome.textContent = nomeExibir;
-    nome.style.fontWeight = '500';
-    nome.style.fontSize = '14px';
-    nome.style.color = '#444';
-    nome.style.marginRight = '8px';
-    previewContainer.appendChild(nome);
-
-    // Player customizado
+    // Player e barra de progresso
     const playerBox = document.createElement('div');
     playerBox.style.display = 'flex';
     playerBox.style.alignItems = 'center';
-    playerBox.style.background = 'transparent';
-    playerBox.style.borderRadius = '12px';
-    playerBox.style.boxShadow = 'none';
-    playerBox.style.padding = '6px 14px 6px 10px';
     playerBox.style.gap = '10px';
-    playerBox.style.minWidth = '180px';
     playerBox.style.flex = '1';
 
-    // Botão play/pause
     const audio = document.createElement('audio');
     audio.src = URL.createObjectURL(audioBlob);
     audio.preload = 'metadata';
     audio.style.display = 'none';
-    let isPlaying = false;
+
     const playPauseBtn = document.createElement('button');
-    playPauseBtn.innerHTML = '<svg width="22" height="22" fill="#222" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    playPauseBtn.type = 'button';
+    playPauseBtn.className = 'threecx-audio-btn threecx-audio-btn--ghost';
+    playPauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     playPauseBtn.title = 'Tocar/Pausar';
-    playPauseBtn.className = 'btn btn-plain';
-    playPauseBtn.style.borderRadius = '50%';
-    playPauseBtn.style.width = '44px';
-    playPauseBtn.style.height = '44px';
-    playPauseBtn.style.fontSize = '28px';
-    playPauseBtn.style.display = 'flex';
-    playPauseBtn.style.alignItems = 'center';
-    playPauseBtn.style.justifyContent = 'center';
     playPauseBtn.onclick = () => {
       if (audio.paused) {
         audio.play();
@@ -425,24 +531,19 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
       }
     };
     audio.addEventListener('play', () => {
-      playPauseBtn.innerHTML = '<svg width="22" height="22" fill="#222" viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>';
+      playPauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>';
     });
     audio.addEventListener('pause', () => {
-      playPauseBtn.innerHTML = '<svg width="22" height="22" fill="#222" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+      playPauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     });
-    playerBox.appendChild(playPauseBtn);
-    playerBox.appendChild(audio);
 
-    // Barra de progresso
     const progressBar = document.createElement('input');
     progressBar.type = 'range';
     progressBar.min = 0;
     progressBar.max = 1;
     progressBar.step = 0.01;
     progressBar.value = 0;
-    progressBar.style.width = '80px';
-    progressBar.style.margin = '0 8px';
-    progressBar.style.accentColor = '#2196F3';
+    progressBar.className = 'threecx-audio-preview-range';
     progressBar.oninput = () => {
       audio.currentTime = progressBar.value * audio.duration;
     };
@@ -452,57 +553,56 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
     audio.addEventListener('loadedmetadata', () => {
       progressBar.value = 0;
     });
-    playerBox.appendChild(progressBar);
 
-    // Tempo decorrido
     const tempoDecorrido = document.createElement('span');
     tempoDecorrido.textContent = '0:00';
     tempoDecorrido.style.fontWeight = '500';
-    tempoDecorrido.style.fontSize = '15px';
+    tempoDecorrido.style.fontSize = '14px';
     tempoDecorrido.style.color = '#222';
     tempoDecorrido.style.marginLeft = '4px';
     audio.addEventListener('timeupdate', () => {
       tempoDecorrido.textContent = formatarDuracao(audio.currentTime);
     });
-    playerBox.appendChild(tempoDecorrido);
 
-    // Tempo total
     const tempoTotal = document.createElement('span');
     tempoTotal.textContent = '0:00';
     tempoTotal.style.fontWeight = '500';
-    tempoTotal.style.fontSize = '15px';
+    tempoTotal.style.fontSize = '14px';
     tempoTotal.style.color = '#222';
     tempoTotal.style.marginLeft = '6px';
     audio.addEventListener('loadedmetadata', () => {
       tempoTotal.textContent = formatarDuracao(audio.duration);
     });
-    playerBox.appendChild(tempoTotal);
 
-    // Ícone de volume
     const volumeIcon = document.createElement('span');
-    volumeIcon.innerHTML = '<svg width="20" height="20" fill="#888" viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.74 2.5-2.26 2.5-4.02z"/></svg>';
+    volumeIcon.innerHTML = '<svg width="18" height="18" fill="#888" viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.74 2.5-2.26 2.5-4.02z"/></svg>';
     volumeIcon.style.marginLeft = '8px';
+
+    playerBox.appendChild(playPauseBtn);
+    playerBox.appendChild(audio);
+    playerBox.appendChild(progressBar);
+    playerBox.appendChild(tempoDecorrido);
+    playerBox.appendChild(tempoTotal);
     playerBox.appendChild(volumeIcon);
 
-    previewContainer.appendChild(playerBox);
+    floatingAudioContainer.appendChild(playerBox);
 
-    // Ajustar botões de ação
+    // Botões de ação à direita (Enviar / Cancelar)
     const actionsBox = document.createElement('div');
     actionsBox.style.display = 'flex';
     actionsBox.style.alignItems = 'center';
-    actionsBox.style.gap = '6px';
-    actionsBox.style.marginLeft = '18px';
+    actionsBox.style.gap = '8px';
+    actionsBox.style.marginLeft = '16px';
 
-    // Botão Enviar
     sendAudioButton = document.createElement('button');
-    sendAudioButton.innerHTML = '<span title="Enviar"><svg width="24" height="24" fill="#2196F3" viewBox="0 0 24 24"><path d="M2 21l21-9-21-9v7l15 2-15 2z"/></svg></span>';
-    sendAudioButton.className = 'btn btn-plain';
+    sendAudioButton.type = 'button';
+    sendAudioButton.className = 'threecx-audio-btn threecx-audio-btn--primary';
     sendAudioButton.title = 'Enviar';
+    sendAudioButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>';
     sendAudioButton.onclick = () => {
       anexarAudioNaConversa(audioFile);
       removerJanelaFlutuante();
       restaurarBotoesChat();
-      // Resetar variáveis de gravação para permitir nova gravação
       mediaRecorder = null;
       audioStream = null;
       audioChunks = [];
@@ -514,15 +614,14 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
       pausaTimestamp = null;
     };
 
-    // Botão Cancelar
     closeAudioPreviewButton = document.createElement('button');
-    closeAudioPreviewButton.innerHTML = '<span title="Cancelar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12l-4.89 4.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg></span>';
-    closeAudioPreviewButton.className = 'btn btn-plain';
+    closeAudioPreviewButton.type = 'button';
+    closeAudioPreviewButton.className = 'threecx-audio-btn threecx-audio-btn--ghost';
     closeAudioPreviewButton.title = 'Cancelar';
+    closeAudioPreviewButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12l-4.89 4.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg>';
     closeAudioPreviewButton.onclick = () => {
       removerJanelaFlutuante();
       restaurarBotoesChat();
-      // Resetar variáveis de gravação para permitir nova gravação
       mediaRecorder = null;
       audioStream = null;
       audioChunks = [];
@@ -536,9 +635,8 @@ function atualizarJanelaFlutuante(tipo, audioBlob = null, audioFile = null) {
 
     actionsBox.appendChild(sendAudioButton);
     actionsBox.appendChild(closeAudioPreviewButton);
-    previewContainer.appendChild(actionsBox);
+    floatingAudioContainer.appendChild(actionsBox);
 
-    floatingAudioContainer.appendChild(previewContainer);
     floatingState = 'preview';
   }
   document.body.appendChild(floatingAudioContainer);
@@ -589,10 +687,16 @@ async function startRecording() {
       atualizarJanelaFlutuante('preview', audioBlob, audioFile);
     };
     mediaRecorder.onpause = () => {
-      if (pauseResumeButton) pauseResumeButton.innerHTML = '<span title="Despausar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>';
+      if (pauseResumeButton) {
+        pauseResumeButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+        pauseResumeButton.title = 'Retomar';
+      }
     };
     mediaRecorder.onresume = () => {
-      if (pauseResumeButton) pauseResumeButton.innerHTML = '<span title="Pausar"><svg width="24" height="24" fill="#333" viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg></span>';
+      if (pauseResumeButton) {
+        pauseResumeButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>';
+        pauseResumeButton.title = 'Pausar';
+      }
     };
     mediaRecorder.start();
     removerJanelaFlutuante();
@@ -608,13 +712,28 @@ async function startRecording() {
 async function stopRecording(cancelar = false) {
   try {
     if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      // Mesmo sem gravação ativa, garante que a UI e o botão voltem ao normal
       removerJanelaFlutuante();
+      const recordBtn = document.querySelector('#audioRecordButton');
+      if (recordBtn) {
+        recordBtn.disabled = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.title = 'Gravar áudio';
+      }
+      isRecording = false;
+      isPaused = false;
+      tempoPausado = 0;
+      pausaTimestamp = null;
       return { success: false, error: 'Nenhuma gravação em andamento' };
     }
     if (cancelar) {
       mediaRecorder.onstop = null;
-      mediaRecorder.stop();
-      audioStream.getTracks().forEach(track => track.stop());
+      if (mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
       pararTimerGravacao();
       removerJanelaFlutuante();
       // Resetar todas as variáveis de estado para permitir nova gravação
@@ -627,6 +746,12 @@ async function stopRecording(cancelar = false) {
       isPaused = false;
       tempoPausado = 0;
       pausaTimestamp = null;
+      const recordBtn = document.querySelector('#audioRecordButton');
+      if (recordBtn) {
+        recordBtn.disabled = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.title = 'Gravar áudio';
+      }
       return { success: true };
     }
     mediaRecorder.stop();
@@ -791,13 +916,12 @@ function substituirFileMessagePorPlayer() {
     // Procura pelo horário
     const horario = fm.parentElement.querySelector('.message-time-info, .message-file-size-info')?.textContent?.trim() || '';
 
-    // Tenta obter o nome do usuário remetente
-    let nomeUsuario = 'Você';
-    const remetente = fm.closest('.message-wrapper, .chat-message, .message')?.querySelector('.sender, .user, .author, .name');
+    // Tenta obter o nome do usuário remetente a partir do próprio balão de mensagem
+    let nomeUsuario = 'Contato';
+    const wrapperMensagem = fm.closest('.message-wrapper, .chat-message, .message');
+    const remetente = wrapperMensagem?.querySelector('.sender, .user, .author, .name');
     if (remetente && remetente.textContent.trim().length > 0) {
       nomeUsuario = remetente.textContent.trim();
-    } else if (nomeUsuarioReal) {
-      nomeUsuario = nomeUsuarioReal;
     }
 
     // Player customizado moderno (igual à pré-visualização)
@@ -819,36 +943,6 @@ function substituirFileMessagePorPlayer() {
     micIcon.style.flex = 'none';
     previewContainer.appendChild(micIcon);
 
-    // Nome do usuário (apenas primeiro nome)
-    let nomeExibir = nomeUsuario;
-    // Se for mensagem recebida (não 'Você'), buscar nome real do participante
-    if (nomeUsuario === 'Você' && fm.closest('.outgoing, .me')) {
-      nomeExibir = 'Você';
-    } else {
-      // Tenta buscar o nome real do participante no DOM
-      const participanteDiv = document.querySelector('#showParticipants');
-      if (participanteDiv) {
-        // Exemplo: "Pressendo, Ana Claudia 1003"
-        const texto = participanteDiv.textContent.trim();
-        // Pega só a parte depois da vírgula, remove números e pega o primeiro nome
-        const partes = texto.split(',');
-        if (partes.length > 1) {
-          const nomes = partes[1].replace(/\d+/g, '').trim().split(' ');
-          if (nomes.length > 0) nomeExibir = nomes[0];
-        }
-      } else {
-        // Fallback: pega só o primeiro nome do nomeUsuario
-        nomeExibir = nomeUsuario.split(' ')[0];
-      }
-    }
-    const nome = document.createElement('span');
-    nome.textContent = nomeExibir;
-    nome.style.fontWeight = '500';
-    nome.style.fontSize = '14px';
-    nome.style.color = '#444';
-    nome.style.marginRight = '8px';
-    previewContainer.appendChild(nome);
-
     // Player customizado
     const playerBox = document.createElement('div');
     playerBox.style.display = 'flex';
@@ -867,16 +961,9 @@ function substituirFileMessagePorPlayer() {
     audio.preload = 'metadata';
     audio.style.display = 'none';
     const playPauseBtn = document.createElement('button');
-    playPauseBtn.innerHTML = '<svg width="22" height="22" fill="#222" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    playPauseBtn.innerHTML = '<svg width="18" height="18" fill="#222" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     playPauseBtn.title = 'Tocar/Pausar';
     playPauseBtn.className = 'btn btn-plain';
-    playPauseBtn.style.borderRadius = '50%';
-    playPauseBtn.style.width = '44px';
-    playPauseBtn.style.height = '44px';
-    playPauseBtn.style.fontSize = '28px';
-    playPauseBtn.style.display = 'flex';
-    playPauseBtn.style.alignItems = 'center';
-    playPauseBtn.style.justifyContent = 'center';
     playPauseBtn.onclick = () => {
       if (audio.paused) {
         audio.play();
@@ -885,22 +972,22 @@ function substituirFileMessagePorPlayer() {
       }
     };
     audio.addEventListener('play', () => {
-      playPauseBtn.innerHTML = '<svg width="22" height="22" fill="#222" viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>';
+      playPauseBtn.innerHTML = '<svg width="18" height="18" fill="#222" viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>';
     });
     audio.addEventListener('pause', () => {
-      playPauseBtn.innerHTML = '<svg width="22" height="22" fill="#222" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+      playPauseBtn.innerHTML = '<svg width="18" height="18" fill="#222" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     });
     playerBox.appendChild(playPauseBtn);
     playerBox.appendChild(audio);
 
-    // Barra de progresso
+    // Barra de progresso (um pouco mais curta para acomodar o controle de velocidade)
     const progressBar = document.createElement('input');
     progressBar.type = 'range';
     progressBar.min = 0;
     progressBar.max = 1;
     progressBar.step = 0.01;
     progressBar.value = 0;
-    progressBar.style.width = '80px';
+    progressBar.style.width = '70px';
     progressBar.style.margin = '0 8px';
     progressBar.style.accentColor = '#2196F3';
     progressBar.oninput = () => {
@@ -942,6 +1029,23 @@ function substituirFileMessagePorPlayer() {
     const volumeIcon = document.createElement('span');
     volumeIcon.innerHTML = '<svg width="20" height="20" fill="#888" viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.74 2.5-2.26 2.5-4.02z"/></svg>';
     volumeIcon.style.marginLeft = '8px';
+
+    // Controle de velocidade: 1x / 1.5x / 2x (integração visual com o player)
+    const speedOptions = [1, 1.5, 2];
+    let speedIndex = 0;
+    const speedButton = document.createElement('button');
+    speedButton.type = 'button';
+    speedButton.className = 'audio-speed-toggle';
+    speedButton.textContent = '1x';
+    speedButton.title = 'Velocidade de reprodução';
+    speedButton.style.marginLeft = '4px';
+    speedButton.onclick = () => {
+      speedIndex = (speedIndex + 1) % speedOptions.length;
+      const rate = speedOptions[speedIndex];
+      audio.playbackRate = rate;
+      speedButton.textContent = `${rate}x`;
+    };
+    playerBox.appendChild(speedButton);
     playerBox.appendChild(volumeIcon);
 
     previewContainer.appendChild(playerBox);
@@ -1008,25 +1112,46 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Remover função de botão customizado de anexar arquivo e ajustar para reposicionar o nativo
+// Reposiciona o botão nativo de anexar arquivo sem duplicar ícones
 function reposicionarBotaoAnexarNativo() {
   const recordButton = document.querySelector('#audioRecordButton');
   if (!recordButton) return;
+
   const chatControls = document.querySelector('#chat-form-controls');
   if (!chatControls) return;
-  // O botão de anexar nativo geralmente é um botão ou span com ícone de clipe
-  // Vamos procurar por um botão ou span com ícone de clipe
-  let attachBtn = chatControls.querySelector('button, span, i, svg');
-  // Procurar pelo ícone de clipe
-  const allBtns = Array.from(chatControls.querySelectorAll('button, span, i, svg'));
-  attachBtn = allBtns.find(el => el.innerHTML.includes('clip') || el.title?.toLowerCase().includes('anexar') || el.outerHTML.includes('paperclip'));
-  if (attachBtn && recordButton.nextSibling !== attachBtn) {
-    // Move o botão de anexar para logo após o botão de gravar
-    recordButton.parentNode.insertBefore(attachBtn, recordButton.nextSibling);
-  }
+
+  // Procura explicitamente por botões de anexar já existentes
+  const candidates = Array.from(chatControls.querySelectorAll('button'));
+  const attachButtons = candidates.filter((btn) => {
+    const title = (btn.getAttribute('title') || btn.getAttribute('aria-label') || '').toLowerCase();
+    const hasPaperclipAttr =
+      btn.hasAttribute('app-paperclip-light-icon') ||
+      btn.hasAttribute('app-paperclip-icon');
+    const html = btn.innerHTML || '';
+
+    return (
+      hasPaperclipAttr ||
+      title.includes('anexar') ||
+      title.includes('attach') ||
+      html.includes('paperclip')
+    );
+  });
+
+  if (!attachButtons.length) return;
+
+  // Se por algum motivo existirem vários botões de anexar, mantém apenas o primeiro
+  const [attachButton, ...duplicates] = attachButtons;
+  duplicates.forEach((btn) => btn.remove());
+
+  // Se o botão já estiver logo após o de gravação, não faz nada
+  if (recordButton.nextElementSibling === attachButton) return;
+
+  // Move o botão (não o ícone interno) para logo após o botão de gravar
+  recordButton.parentNode.insertBefore(attachButton, recordButton.nextSibling);
 }
-// Chamar sempre que garantir/injetar o botão de gravação
-setInterval(reposicionarBotaoAnexarNativo, 1500);
+
+// Reposiciona periodicamente, mas com intervalo maior para evitar "piscadas" visuais
+setInterval(reposicionarBotaoAnexarNativo, 3000);
 
 // CSS global para garantir alinhamento horizontal dos botões do chat
 (function garantirFlexBarraChat() {
@@ -1042,6 +1167,69 @@ setInterval(reposicionarBotaoAnexarNativo, 1500);
     #chat-form-controls > * {
       vertical-align: middle !important;
       margin: 0 2px !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Estilos específicos para o player de áudio dentro da conversa
+(function estiloCustomAudioPlayer() {
+  if (document.getElementById('threecx-custom-audio-player-style')) return;
+  const style = document.createElement('style');
+  style.id = 'threecx-custom-audio-player-style';
+  style.textContent = `
+    .custom-audio-player button.btn.btn-plain {
+      background: #e5ebf5;
+      border-radius: 999px !important;
+      width: 32px !important;
+      height: 32px !important;
+      min-width: 32px !important;
+      min-height: 32px !important;
+      aspect-ratio: 1 / 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    }
+    .custom-audio-player button.btn.btn-plain:hover {
+      background: #d7e3f8;
+      box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+    }
+    .custom-audio-player button.btn.btn-plain:active {
+      transform: scale(0.95);
+      box-shadow: none;
+    }
+    .custom-audio-player button.btn.btn-plain svg {
+      width: 18px;
+      height: 18px;
+      fill: #222222;
+    }
+    .custom-audio-player .audio-speed-toggle {
+      border-radius: 999px;
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      min-height: 28px;
+      border: none;
+      padding: 0;
+      font-size: 11px;
+      font-weight: 500;
+      background: #e5ebf5;
+      color: #111827;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    }
+    .custom-audio-player .audio-speed-toggle:hover {
+      background: #d7e3f8;
+    }
+    .custom-audio-player .audio-speed-toggle:active {
+      transform: scale(0.96);
     }
   `;
   document.head.appendChild(style);
