@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "3CX Audio Extension",
-  "version": "1.0",
+  "version": "1.2",
   "description": "Extensão para integração com o chat do 3CX",
   
   "browser_action": {
